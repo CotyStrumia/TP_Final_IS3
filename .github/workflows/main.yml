@@ -226,14 +226,14 @@ jobs:
       - name: Start frontend preview
         working-directory: ./ventas-frontend
         run: |
-          # Use preview to serve the built site on port 5173 (matches Cypress baseUrl)
-          nohup npm run preview -- --port 5173 &
+          # Use preview to serve the built site on port 5174 (matches Cypress baseUrl)
+          nohup npm run preview -- --port 5174 &
 
       - name: Wait for services
         working-directory: ./ventas-frontend
         run: |
-          # wait for frontend (5173) and backend (8080)
-          npx wait-on http://localhost:5173 http://localhost:8080
+          # wait for frontend (5174) and backend (8080)
+          npx wait-on http://localhost:5174 http://localhost:8080
 
       - name: Run Cypress tests
         working-directory: ./ventas-frontend
