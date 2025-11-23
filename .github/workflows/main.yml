@@ -107,8 +107,8 @@ jobs:
         working-directory: ./ventas-frontend
 
   # ----------------------------------------------------
-  # CYPRESS E2E TESTS
-  # ----------------------------------------------------
+# CYPRESS E2E TESTS
+# ----------------------------------------------------
   e2e_tests:
     runs-on: ubuntu-latest
     needs: [build_backend, build_frontend]
@@ -126,6 +126,7 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -141,24 +142,31 @@ jobs:
           name: frontend-dist
           path: dist
 
-      # ENV FILES
-      - name: Create envs
+      # -----------------------------------------
+      # ✔ EXPORTAR VARIABLES AL AMBIENTE DE CI
+      # -----------------------------------------
+      - name: Set backend envs for CI
         run: |
-          echo "DB_HOST=127.0.0.1" > .env.qa
-          echo "DB_PORT=3306" >> .env.qa
-          echo "DB_USER=root" >> .env.qa
-          echo "DB_PASS=rootpass" >> .env.qa
-          echo "DB_NAME=ventas" >> .env.qa
-          echo "DB_SSL_MODE=disable" >> .env.qa
-          cp .env.qa .env.prod
-      # START BACKEND
+          echo "DB_HOST=127.0.0.1" >> $GITHUB_ENV
+          echo "DB_PORT=3306" >> $GITHUB_ENV
+          echo "DB_USER=root" >> $GITHUB_ENV
+          echo "DB_PASS=rootpass" >> $GITHUB_ENV
+          echo "DB_NAME=ventas" >> $GITHUB_ENV
+          echo "DB_SSL_MODE=disable" >> $GITHUB_ENV
+
+      # -----------------------------------------
+      # BACKEND
+      # -----------------------------------------
       - name: Start backend
         run: |
           chmod +x backend-app
           nohup ./backend-app > backend.log 2>&1 &
-          sleep 3
+          sleep 5
           tail -n 50 backend.log || true
-      # START FRONTEND PREVIEW USING dist/
+
+      # -----------------------------------------
+      # FRONTEND PREVIEW USING dist/
+      # -----------------------------------------
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -171,12 +179,18 @@ jobs:
           nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > frontend.log 2>&1 &
           sleep 3
           tail -n 80 frontend.log || true
+
+      # -----------------------------------------
       # WAIT
+      # -----------------------------------------
       - name: Wait for frontend and backend
         run: |
           echo "Waiting for services..."
-          npx wait-on http://localhost:5174 http://localhost:8080/productos --timeout 120000
-      # CY
+          npx wait-on tcp:8080 http://localhost:5174 --timeout 180000
+
+      # -----------------------------------------
+      # CYPRESS
+      # -----------------------------------------
       - name: Run Cypress
         working-directory: ./ventas-frontend
         run: npm run cypress:ci
