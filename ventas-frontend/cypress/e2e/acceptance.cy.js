@@ -7,6 +7,9 @@ describe('Acceptance - flujo básico', () => {
     // Aseguramos que el select exista y forzamos entorno QA en localStorage
     cy.window().then((win) => {
       win.localStorage.setItem('entorno', 'qa');
+      // Añadir token y rol fake para permitir acceso a rutas protegidas en CI/local
+      win.localStorage.setItem('token', 'fake-jwt-token');
+      win.localStorage.setItem('rol', 'vendedor');
     });
     // Ir a la pantalla de ventas
     cy.visit('/ventas');
