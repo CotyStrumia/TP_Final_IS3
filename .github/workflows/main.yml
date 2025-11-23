@@ -1,10 +1,9 @@
-name: CI - Test, Build, Push & Deploy
+name: CI - Test, Build, Cypress & Push
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "qa"]
   pull_request:
-  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,172 +14,185 @@ env:
   IMAGE_BACK: ghcr.io/${{ github.repository_owner }}/tp_final_is3-back
   IMAGE_FRONT: ghcr.io/${{ github.repository_owner }}/tp_final_is3-front
 
-# =====================================================================
-# 1 TEST BACKEND
-# =====================================================================
 jobs:
-  test-back:
+
+  # ----------------------------------------------------
+  # CHECK
+  # ----------------------------------------------------
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22.x"
-          cache: true
-
-      - name: Backend tests
-        working-directory: ./ventas-app
-        run: |
-          go test -v ./... -coverprofile=coverage.out
-          go tool cover -func=coverage.out | tail -n 1
-
-      - name: Upload backend coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-coverage
-          path: ventas-app/coverage.out
-
-# =====================================================================
-# 2 TEST FRONTEND
-# =====================================================================
-  test-front:
+  # ----------------------------------------------------
+  # BUILD BACKEND
+  # ----------------------------------------------------
+  build_backend:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: ventas-frontend/package-lock.json
-
-      - name: Install
-        working-directory: ./ventas-frontend
-        run: npm ci
-
-      - name: Typecheck
-        working-directory: ./ventas-frontend
-        run: npm run typecheck --if-present || npx tsc --noEmit
-
-      - name: Lint
-        working-directory: ./ventas-frontend
-        run: npm run lint --if-present || echo "no lint script"
-
-      - name: Unit tests
-        working-directory: ./ventas-frontend
-        env:
-          CI: true
-        run: npm test --if-present || echo "no tests"
-
-      - name: Production build check
-        working-directory: ./ventas-frontend
-        run: npm run build
-
-# =====================================================================
-# 2.5 BUILD BACKEND (para Cypress)
-# =====================================================================
-  build-back:
-    runs-on: ubuntu-latest
-    needs: [test-back]
+    needs: check
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22.x"
+          go-version: "1.22"
 
-      - name: Build backend
+      - name: Build backend binary
         working-directory: ./ventas-app
-        run: go build -o backend-app ./cmd/main.go
+        run: go build -o ../backend-app ./cmd/main.go
 
-      - name: Upload backend artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: backend-artifact
-          path: ventas-app/backend-app
+          name: backend-app
+          path: backend-app
 
-# =====================================================================
-# 2.6 BUILD FRONTEND (para Cypress)
-# =====================================================================
-  build-front:
+  # ----------------------------------------------------
+  # TEST BACKEND
+  # ----------------------------------------------------
+  test_backend:
     runs-on: ubuntu-latest
-    needs: [test-front]
+    needs: build_backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run backend tests
+        working-directory: ./ventas-app
+        run: go test ./... -v
+
+  # ----------------------------------------------------
+  # BUILD FRONTEND
+  # ----------------------------------------------------
+  build_frontend:
+    runs-on: ubuntu-latest
+    needs: check
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install
+      - run: npm ci
         working-directory: ./ventas-frontend
-        run: npm ci
 
-      - name: Build frontend
+      - run: npm run build
         working-directory: ./ventas-frontend
-        run: npm run build
 
-      - name: Upload frontend dist
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: ventas-frontend/dist
 
-# =====================================================================
-# 3 CYPRESS E2E TESTS (sobre app REAL ejecutando front+back)
-# =====================================================================
-  e2e-tests:
-    name: E2E Tests (Cypress)
-    needs: [build-back, build-front]
+  # ----------------------------------------------------
+  # TEST FRONTEND
+  # ----------------------------------------------------
+  test_frontend:
     runs-on: ubuntu-latest
-
+    needs: build_frontend
     steps:
       - uses: actions/checkout@v4
-
-      # Descargar artefactos buildiados
-      - uses: actions/download-artifact@v4
-        with:
-          name: backend-artifact
-          path: backend/
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend-dist/
-
-      # Start backend real (binario)
-      - name: Start backend
-        run: |
-          chmod +x backend/backend-app
-          nohup backend/backend-app > backend.log 2>&1 &
-          sleep 5
-
-      # Start frontend real (dist)
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Serve frontend dist
+      - run: npm ci
+        working-directory: ./ventas-frontend
+
+      - run: npm run test:ci
+        working-directory: ./ventas-frontend
+
+  # ----------------------------------------------------
+  # CYPRESS E2E (BACK REAL + FRONT DIST REAL)
+  # ----------------------------------------------------
+  e2e_tests:
+    runs-on: ubuntu-latest
+    needs: [build_backend, build_frontend]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: ventas
+        ports:
+          - "3306:3306"
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # BACKEND BINARY
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-app
+          path: .
+
+      # FRONTEND DIST
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      # ENV FILES
+      - name: Create envs
         run: |
-          npm install -g serve
-          nohup serve -s frontend-dist -l 5174 > frontend.log 2>&1 &
-          sleep 5
+          echo "DB_HOST=127.0.0.1" > .env
+          echo "DB_PORT=3306" >> .env
+          echo "DB_USER=root" >> .env
+          echo "DB_PASS=rootpass" >> .env
+          echo "DB_NAME=ventas" >> .env
+          echo "DB_SSL_MODE=disable" >> .env
 
-      # Wait for both services
-      - name: Wait for backend & frontend
-        run: npx wait-on http://localhost:5174 http://localhost:8080
+      # START BACKEND
+      - name: Start backend
+        run: |
+          chmod +x backend-app
+          nohup ./backend-app > backend.log 2>&1 &
+          sleep 3
 
-      # Run Cypress
+      # START FRONTEND (dist)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+        working-directory: ./ventas-frontend
+
+      - name: Start preview server using dist
+        run: |
+          nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > frontend.log 2>&1 &
+          sleep 3
+
+      # WAIT
+      - name: Wait for services
+        run: |
+          npx wait-on http://localhost:5174 http://localhost:8080/productos --timeout 120000
+
+      # CYPRESS
       - name: Run Cypress
         working-directory: ./ventas-frontend
         run: npm run cypress:ci
 
-# =====================================================================
-# 4 BUILD & PUSH QA
-# =====================================================================
-  build-push-qa:
-    name: Build & Push QA Images
-    needs: [e2e-tests]
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            backend.log
+            frontend.log
+
+  # ----------------------------------------------------
+  # BUILD & PUSH IMAGES (UNA SOLA VEZ)
+  # ----------------------------------------------------
+  build_and_push_images:
     runs-on: ubuntu-latest
+    needs: [test_backend, test_frontend, e2e_tests]
     permissions:
       contents: read
       packages: write
@@ -200,112 +212,29 @@ jobs:
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      # Backend QA
-      - name: Build & Push Backend QA
+      # ---- BACKEND IMAGE (UNA SOLA BUILD)
+      - name: Build & Push Backend Image
         uses: docker/build-push-action@v6
         with:
           context: ./ventas-app
           file: ./ventas-app/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_BACK }}:qa
-            ${{ env.IMAGE_BACK }}:${{ steps.vars.outputs.SHORT_SHA }}
             ${{ env.IMAGE_BACK }}:latest
-
-      # Frontend QA
-      - name: Build & Push Frontend QA
-        uses: docker/build-push-action@v6
-        with:
-          context: ./ventas-frontend
-          file: ./ventas-frontend/Dockerfile
-          push: true
-          build-args: BUILD_MODE=qa
-          tags: |
-            ${{ env.IMAGE_FRONT }}:qa
-            ${{ env.IMAGE_FRONT }}:${{ steps.vars.outputs.SHORT_SHA }}
-            ${{ env.IMAGE_FRONT }}:latest
-
-# =====================================================================
-# 5 DEPLOY QA
-# =====================================================================
-  deploy-qa:
-    name: Deploy to QA
-    needs: [build-push-qa]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Deploy Backend QA
-        run: curl -fsSL -X POST "${{ secrets.RENDER_BACK_QA_HOOK }}"
-
-      - name: Deploy Frontend QA
-        run: curl -fsSL -X POST "${{ secrets.RENDER_FRONT_QA_HOOK }}"
-
-# =====================================================================
-# 6 BUILD & PUSH PROD
-# =====================================================================
-  build-push-prod:
-    name: Build & Push PROD Images
-    needs: [e2e-tests]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set short SHA
-        id: vars
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USER }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      # Backend PROD
-      - name: Build & Push Backend PROD
-        uses: docker/build-push-action@v6
-        with:
-          context: ./ventas-app
-          file: ./ventas-app/Dockerfile
-          push: true
-          tags: |
+            ${{ env.IMAGE_BACK }}:${{ steps.vars.outputs.SHORT_SHA }}
+            ${{ env.IMAGE_BACK }}:qa
             ${{ env.IMAGE_BACK }}:prod
-            ${{ env.IMAGE_BACK }}:prod-${{ steps.vars.outputs.SHORT_SHA }}
 
-      # Frontend PROD
-      - name: Build & Push Frontend PROD
+      # ---- FRONTEND IMAGE (UNA SOLA BUILD)
+      - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
         with:
           context: ./ventas-frontend
           file: ./ventas-frontend/Dockerfile
           push: true
-          build-args: BUILD_MODE=production
           tags: |
+            ${{ env.IMAGE_FRONT }}:latest
+            ${{ env.IMAGE_FRONT }}:${{ steps.vars.outputs.SHORT_SHA }}
+            ${{ env.IMAGE_FRONT }}:qa
             ${{ env.IMAGE_FRONT }}:prod
-            ${{ env.IMAGE_FRONT }}:prod-${{ steps.vars.outputs.SHORT_SHA }}
 
-# =====================================================================
-# 7 DEPLOY PROD
-# =====================================================================
-  deploy-prod:
-    name: Deploy to Production
-    needs: [build-push-prod]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://tp8-front-prod-tn48.onrender.com
-
-    steps:
-      - name: Deploy Backend PROD
-        run: curl -fsSL -X POST "${{ secrets.RENDER_BACK_PROD_HOOK }}"
-
-      - name: Deploy Frontend PROD
-        run: curl -fsSL -X POST "${{ secrets.RENDER_FRONT_PROD_HOOK }}"
