@@ -174,6 +174,8 @@ jobs:
         run: npm ci
 
       - name: Create .env.qa for CI (use local MySQL service)
+        env:
+          QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
         run: |
           echo "Creating .env.qa for CI (local MySQL service)"
           echo "DB_HOST=127.0.0.1" > .env.qa
@@ -182,7 +184,20 @@ jobs:
           echo "DB_PASS=rootpass" >> .env.qa
           echo "DB_NAME=ventas" >> .env.qa
           echo "DB_SSL_MODE=disable" >> .env.qa
-          echo "JWT_SECRET=${{ secrets.QA_JWT_SECRET }}" >> .env.qa
+          echo "JWT_SECRET=${QA_JWT_SECRET:-ci-secret}" >> .env.qa
+
+      - name: Create .env.prod for CI (use local MySQL service)
+        env:
+          QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
+        run: |
+          echo "Creating .env.prod for CI (local MySQL service)"
+          echo "DB_HOST=127.0.0.1" > .env.prod
+          echo "DB_PORT=3306" >> .env.prod
+          echo "DB_USER=root" >> .env.prod
+          echo "DB_PASS=rootpass" >> .env.prod
+          echo "DB_NAME=ventas" >> .env.prod
+          echo "DB_SSL_MODE=disable" >> .env.prod
+          echo "JWT_SECRET=${QA_JWT_SECRET:-ci-secret}" >> .env.prod
 
       - name: Start backend (with logging)
         run: |
