@@ -1,31 +1,27 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import history from "connect-history-api-fallback";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react-swc';
 
 export default defineConfig({
-  plugins: [
-    react(),
-
-    // 🔥 Plugin para que el preview soporte rutas SPA
-    {
-      name: "spa-fallback",
-      configureServer(server) {
-        server.middlewares.use(
-          history({
-            index: "/index.html",
-          })
-        );
-      },
-    },
-  ],
-
+  plugins: [react()],
   server: {
-    port: 5174,
-    host: "0.0.0.0",
+    host: true,
+    port: 5173,
   },
-
   preview: {
+    host: true,
     port: 5174,
-    host: "0.0.0.0",
   },
+  build: {
+    outDir: 'dist',
+  },
+  // 🔥 AGREGAR ESTO 🔥
+  resolve: {
+    alias: {
+      // nada raro, pero lo dejamos por si
+    },
+  },
+  optimizeDeps: {},
+
+  // 👇 ESTO ES LO QUE IMPORTA 👇
+  appType: 'spa',  // obliga fallback a index.html
 });
