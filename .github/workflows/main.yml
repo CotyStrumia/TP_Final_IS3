@@ -24,12 +24,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-   # ----------------------------------------------------
+  # ----------------------------------------------------
+  # TEST BACKEND
+  # ----------------------------------------------------
+  test_backend:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Run backend tests
+        working-directory: ./ventas-app
+        run: go test ./... -v
+
+  # ----------------------------------------------------
   # BUILD BACKEND
   # ----------------------------------------------------
   build_backend:
     runs-on: ubuntu-latest
-    needs: check
+    needs: test_backend
     steps:
       - uses: actions/checkout@v4
 
@@ -47,28 +63,11 @@ jobs:
           path: backend-app
 
   # ----------------------------------------------------
-  # TEST BACKEND
-  # ----------------------------------------------------
-  test_backend:
-    runs-on: ubuntu-latest
-    needs: build_backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-
-      - name: Run backend tests
-        working-directory: ./ventas-app
-        run: go test ./... -v
-
-  # ----------------------------------------------------
   # BUILD FRONTEND
   # ----------------------------------------------------
   build_frontend:
     runs-on: ubuntu-latest
-    needs: check
+    needs: test_frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -92,7 +91,7 @@ jobs:
   # ----------------------------------------------------
   test_frontend:
     runs-on: ubuntu-latest
-    needs: build_frontend
+    needs: check
     steps:
       - uses: actions/checkout@v4
 
@@ -209,7 +208,7 @@ jobs:
   # ----------------------------------------------------
   build_and_push_images:
     runs-on: ubuntu-latest
-    needs: [test_backend, test_frontend, e2e_tests]
+    needs: [e2e_tests]
     permissions:
       contents: read
       packages: write
@@ -246,3 +245,37 @@ jobs:
           file: ./ventas-frontend/Dockerfile
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-front:release
+
+  # ----------------------------------------------------
+  # DEPLOY QA (AUTOMÁTICO)
+  # ----------------------------------------------------
+  deploy_qa:
+    name: Deploy to QA
+    runs-on: ubuntu-latest
+    needs: build_and_push_images
+    if: github.ref == 'refs/heads/qa'
+    steps:
+      - name: Deploy Backend QA
+        run: curl -fsSL -X POST "${{ secrets.RENDER_BACK_QA_HOOK }}"
+
+      - name: Deploy Frontend QA
+        run: curl -fsSL -X POST "${{ secrets.RENDER_FRONT_QA_HOOK }}"
+
+  # ----------------------------------------------------
+  # DEPLOY PROD (MANUAL APPROVAL)
+  # ----------------------------------------------------
+  deploy_prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build_and_push_images
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://tp8-front-prod-tn48.onrender.com
+      # 👆 GitHub pedirá aprobación ANTES de ejecutar este job
+    steps:
+      - name: Deploy Backend PROD
+        run: curl -fsSL -X POST "${{ secrets.RENDER_BACK_PROD_HOOK }}"
+
+      - name: Deploy Frontend PROD
+        run: curl -fsSL -X POST "${{ secrets.RENDER_FRONT_PROD_HOOK }}"
