@@ -209,18 +209,18 @@ jobs:
       - name: Start frontend preview
         working-directory: ./ventas-frontend
         run: |
-            # Use preview to serve the built site on port 5174 (matches Cypress baseUrl)
-            # Redirect logs to frontend.log for diagnostics
-            nohup npm run preview -- --port 5174 > frontend.log 2>&1 &
-            sleep 1
-            echo "---- frontend log (start) ----"
-            tail -n 200 frontend.log || true
+          # Use preview to serve the built site on port 5174 (matches Cypress baseUrl)
+          # Redirect logs to frontend.log for diagnostics
+          nohup npm run preview -- --port 5174 > frontend.log 2>&1 &
+          sleep 1
+          echo "---- frontend log (start) ----"
+          tail -n 200 frontend.log || true
 
       - name: Wait for services (with diagnostics on failure)
         working-directory: ./ventas-frontend
         run: |
-          echo "Waiting for frontend (5174) and backend (8080) to be available..."
-          if npx wait-on --timeout 120000 http://localhost:5174 http://localhost:8080; then
+          echo "Waiting for frontend (5174) and backend (8080/productos) to be available..."
+          if npx wait-on --timeout 120000 http://localhost:5174 http://localhost:8080/productos; then
             echo "Services are up"
           else
             echo "Wait-on timed out. Collecting diagnostics..."
@@ -238,8 +238,6 @@ jobs:
             fi
             echo "---- listening ports ----"
             ss -ltnp || netstat -ltnp || true
-            echo "---- recent journalctl (if available) ----"
-            journalctl -u backend-app --no-pager -n 200 || true
             exit 1
           fi
 
