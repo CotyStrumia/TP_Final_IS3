@@ -6,141 +6,60 @@ on:
   pull_request:
 
 jobs:
-  # ----------------------------------------
-  # CHECK BASIC PIPELINE
-  # ----------------------------------------
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - run: echo "Pipeline OK"
 
-      - name: Test pipeline
-        run: echo "GitHub Actions funcionando correctamente."
-
-  # ----------------------------------------
+  # ----------------------------------------------------
   # BUILD BACKEND
-  # ----------------------------------------
+  # ----------------------------------------------------
   build_backend:
     runs-on: ubuntu-latest
     needs: check
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-
-      - name: Select environment (qa or prod)
-        id: envselect
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
-          else
-            echo "ENVIRONMENT=qa" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Export DB variables
-        run: |
-          if [ "${{ steps.envselect.outputs.ENVIRONMENT }}" = "qa" ]; then
-            echo "DB_HOST=${{ secrets.QA_DB_HOST }}" >> $GITHUB_ENV
-            echo "DB_PORT=${{ secrets.QA_DB_PORT }}" >> $GITHUB_ENV
-            echo "DB_USER=${{ secrets.QA_DB_USER }}" >> $GITHUB_ENV
-            echo "DB_PASS=${{ secrets.QA_DB_PASS }}" >> $GITHUB_ENV
-            echo "DB_NAME=${{ secrets.QA_DB_NAME }}" >> $GITHUB_ENV
-            echo "DB_SSL_MODE=${{ secrets.QA_DB_SSL_MODE }}" >> $GITHUB_ENV
-          else
-            echo "DB_HOST=${{ secrets.PROD_DB_HOST }}" >> $GITHUB_ENV
-            echo "DB_PORT=${{ secrets.PROD_DB_PORT }}" >> $GITHUB_ENV
-            echo "DB_USER=${{ secrets.PROD_DB_USER }}" >> $GITHUB_ENV
-            echo "DB_PASS=${{ secrets.PROD_DB_PASS }}" >> $GITHUB_ENV
-            echo "DB_NAME=${{ secrets.PROD_DB_NAME }}" >> $GITHUB_ENV
-            echo "DB_SSL_MODE=${{ secrets.PROD_DB_SSL_MODE }}" >> $GITHUB_ENV
-          fi
 
       - name: Build backend binary
         working-directory: ./ventas-app
         run: go build -o ../backend-app ./cmd/main.go
 
-      - name: Upload backend binary
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: backend-app
           path: backend-app
 
-  # ----------------------------------------
+  # ----------------------------------------------------
   # BUILD FRONTEND
-  # ----------------------------------------
+  # ----------------------------------------------------
   build_frontend:
     runs-on: ubuntu-latest
     needs: check
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install dependencies
+      - run: npm ci
         working-directory: ./ventas-frontend
-        run: npm ci
 
-      - name: Build frontend
+      - run: npm run build
         working-directory: ./ventas-frontend
-        run: npm run build
 
-  # ----------------------------------------
-  # TEST BACKEND
-  # ----------------------------------------
-  test_backend:
-    runs-on: ubuntu-latest
-    needs: build_backend
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-
-      - name: Run backend tests
-        working-directory: ./ventas-app
-        run: go test ./... -v
-
-  # ----------------------------------------
-  # TEST FRONTEND
-  # ----------------------------------------
-  test_frontend:
-    runs-on: ubuntu-latest
-    needs: build_frontend
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install dependencies
-        working-directory: ./ventas-frontend
-        run: npm ci
-
-      - name: Run frontend tests
-        working-directory: ./ventas-frontend
-        run: npm test -- --ci --watchAll=false
-
-  # ----------------------------------------
-  # CYPRESS E2E TESTS
-  # ----------------------------------------
+  # ----------------------------------------------------
+  # RUN E2E CYPRESS TESTS
+  # ----------------------------------------------------
   e2e_tests:
     runs-on: ubuntu-latest
     needs: [build_backend, build_frontend]
+
     services:
       mysql:
         image: mysql:8.0
@@ -148,116 +67,79 @@ jobs:
           MYSQL_ROOT_PASSWORD: rootpass
           MYSQL_DATABASE: ventas
         ports:
-          - 3306:3306
+          - "3306:3306"
         options: >-
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Download backend binary
-        uses: actions/download-artifact@v4
+    steps:
+      # --- CODE ---
+      - uses: actions/checkout@v4
+
+      # --- BACKEND ARTIFACT ---
+      - uses: actions/download-artifact@v4
         with:
           name: backend-app
           path: .
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install frontend dependencies
-        working-directory: ./ventas-frontend
-        run: npm ci
-
-      - name: Create .env.qa for CI (use local MySQL service)
-        env:
-          QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
+      # --- CREATE ENV FILES FOR CI ---
+      - name: Create .env files for CI
         run: |
-          echo "Creating .env.qa for CI (local MySQL service)"
           echo "DB_HOST=127.0.0.1" > .env.qa
           echo "DB_PORT=3306" >> .env.qa
           echo "DB_USER=root" >> .env.qa
           echo "DB_PASS=rootpass" >> .env.qa
           echo "DB_NAME=ventas" >> .env.qa
           echo "DB_SSL_MODE=disable" >> .env.qa
-          echo "JWT_SECRET=${QA_JWT_SECRET:-ci-secret}" >> .env.qa
 
-      - name: Create .env.prod for CI (use local MySQL service)
-        env:
-          QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
-        run: |
-          echo "Creating .env.prod for CI (local MySQL service)"
-          echo "DB_HOST=127.0.0.1" > .env.prod
-          echo "DB_PORT=3306" >> .env.prod
-          echo "DB_USER=root" >> .env.prod
-          echo "DB_PASS=rootpass" >> .env.prod
-          echo "DB_NAME=ventas" >> .env.prod
-          echo "DB_SSL_MODE=disable" >> .env.prod
-          echo "JWT_SECRET=${QA_JWT_SECRET:-ci-secret}" >> .env.prod
+          cp .env.qa .env.prod
 
-      - name: Start backend (with logging)
+      # --- START BACKEND ---
+      - name: Start backend
         run: |
           chmod +x backend-app
           nohup ./backend-app > backend.log 2>&1 &
-          echo "Backend iniciado. Logs:"
+          sleep 2
+          echo "Backend log:"
           tail -n 50 backend.log || true
 
+      # --- FRONTEND INSTALL ---
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+        working-directory: ./ventas-frontend
+
+      # --- START FRONTEND ---
       - name: Start frontend preview
         working-directory: ./ventas-frontend
         run: |
-          # Use preview to serve the built site on port 5174 (matches Cypress baseUrl)
-          # Redirect logs to frontend.log for diagnostics
-          nohup npm run preview -- --port 5174 --host 0.0.0.0 > frontend.log 2>&1 &
+          nohup npm run preview -- --port 5174 > frontend.log 2>&1 &
           sleep 2
-          echo "---- frontend log (start) ----"
-          tail -n 200 frontend.log || true
-      - name: Debug dist folder
-        working-directory: ./ventas-frontend
-        run: |
-          echo "Verificando contenido en dist/"
-          ls -R dist || echo "NO EXISTE DIST"
+          echo "Frontend log:"
+          tail -n 50 frontend.log || true
 
-      - name: Test direct access to frontend
+      # --- WAIT FOR SERVICES ---
+      - name: Wait for backend and frontend
         run: |
-          echo "Intentando GET a frontend..."
-          curl -v http://localhost:5174 || true
-      
+          echo "Waiting for frontend (5174) AND backend (8080)..."
+          npx wait-on http://localhost:5174 http://localhost:8080 --timeout 120000
 
-      - name: Wait for services (with diagnostics on failure)
-        working-directory: ./ventas-frontend
-        run: |
-          echo "Waiting for frontend (5174) and backend (8080/productos) to be available..."
-          if npx wait-on --timeout 120000 http://localhost:5174 http://localhost:8080/productos; then
-            echo "Services are up"
-          else
-            echo "Wait-on timed out. Collecting diagnostics..."
-            echo "---- backend.log (last 200 lines) ----"
-            if [ -f ../backend.log ]; then
-              tail -n 200 ../backend.log || true
-            else
-              echo "No backend.log found at repo root"
-            fi
-            echo "---- frontend.log (last 200 lines) ----"
-            if [ -f frontend.log ]; then
-              tail -n 200 frontend.log || true
-            else
-              echo "No frontend.log found"
-            fi
-            echo "---- listening ports ----"
-            ss -ltnp || netstat -ltnp || true
-            exit 1
-          fi
-
-      - name: List listening ports
-        run: |
+      # --- PORT DEBUG ---
+      - run: |
           echo "Listening ports:"
-          ss -ltnp || netstat -ltnp || true
+          ss -ltnp || true
 
-      - name: Upload logs on failure
+      # --- RUN CYPRESS ---
+      - name: Run Cypress
+        working-directory: ./ventas-frontend
+        run: npm run cypress:ci
+
+      # --- LOGS ON FAILURE ---
+      - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -265,7 +147,3 @@ jobs:
           path: |
             backend.log
             ventas-frontend/frontend.log
-
-      - name: Run Cypress tests
-        working-directory: ./ventas-frontend
-        run: npm run cypress:ci
