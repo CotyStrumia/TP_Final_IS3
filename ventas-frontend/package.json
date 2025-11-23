@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview --port 5174 --host 0.0.0.0 --outDir dist",
+    "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

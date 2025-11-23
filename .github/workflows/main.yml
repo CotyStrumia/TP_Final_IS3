@@ -117,7 +117,7 @@ jobs:
       - name: Start frontend preview
         working-directory: ./ventas-frontend
         run: |
-          nohup npm run preview -- --port 5174 > frontend.log 2>&1 &
+          nohup npm run preview > frontend.log 2>&1 &
           sleep 2
           echo "Frontend log:"
           tail -n 50 frontend.log || true
