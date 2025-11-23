@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-
     "lint": "eslint .",
     "preview": "vite preview --port 5174 --host 0.0.0.0 --outDir dist",
     "test": "jest",
@@ -32,6 +31,7 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react-swc": "^4.1.0",
+    "connect-history-api-fallback": "^2.0.0",
     "cypress": "^15.6.0",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -45,7 +45,7 @@
     "typescript-eslint": "^8.45.0",
     "util": "^0.12.5",
     "vite": "^7.1.7",
-    "whatwg-fetch": "^3.6.20",
-    "wait-on": "^7.0.1"
+    "wait-on": "^7.0.1",
+    "whatwg-fetch": "^3.6.20"
   }
 }
