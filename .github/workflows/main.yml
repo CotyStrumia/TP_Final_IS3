@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-  # ----------------------------------------------------
+   # ----------------------------------------------------
   # BUILD BACKEND
   # ----------------------------------------------------
   build_backend:
@@ -32,6 +32,7 @@ jobs:
     needs: check
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
@@ -53,6 +54,7 @@ jobs:
     needs: build_backend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
@@ -69,6 +71,7 @@ jobs:
     needs: check
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -92,6 +95,7 @@ jobs:
     needs: build_frontend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -103,7 +107,7 @@ jobs:
         working-directory: ./ventas-frontend
 
   # ----------------------------------------------------
-  # CYPRESS E2E (BACK REAL + FRONT DIST REAL)
+  # CYPRESS E2E TESTS
   # ----------------------------------------------------
   e2e_tests:
     runs-on: ubuntu-latest
@@ -122,17 +126,16 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-
     steps:
       - uses: actions/checkout@v4
 
-      # BACKEND BINARY
+      # BACKEND
       - uses: actions/download-artifact@v4
         with:
           name: backend-app
           path: .
 
-      # FRONTEND DIST
+      # FRONTEND (dist)
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
@@ -141,21 +144,21 @@ jobs:
       # ENV FILES
       - name: Create envs
         run: |
-          echo "DB_HOST=127.0.0.1" > .env
-          echo "DB_PORT=3306" >> .env
-          echo "DB_USER=root" >> .env
-          echo "DB_PASS=rootpass" >> .env
-          echo "DB_NAME=ventas" >> .env
-          echo "DB_SSL_MODE=disable" >> .env
-
+          echo "DB_HOST=127.0.0.1" > .env.qa
+          echo "DB_PORT=3306" >> .env.qa
+          echo "DB_USER=root" >> .env.qa
+          echo "DB_PASS=rootpass" >> .env.qa
+          echo "DB_NAME=ventas" >> .env.qa
+          echo "DB_SSL_MODE=disable" >> .env.qa
+          cp .env.qa .env.prod
       # START BACKEND
       - name: Start backend
         run: |
           chmod +x backend-app
           nohup ./backend-app > backend.log 2>&1 &
           sleep 3
-
-      # START FRONTEND (dist)
+          tail -n 50 backend.log || true
+      # START FRONTEND PREVIEW USING dist/
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -163,25 +166,22 @@ jobs:
       - run: npm ci
         working-directory: ./ventas-frontend
 
-      - name: Start preview server using dist
+      - name: Start preview server using built dist
         run: |
           nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > frontend.log 2>&1 &
           sleep 3
-
+          tail -n 80 frontend.log || true
       # WAIT
-      - name: Wait for services
+      - name: Wait for frontend and backend
         run: |
-          npx wait-on \
-            tcp:8080 \
-            http://localhost:5174 \
-            --timeout 180000
-
-      # CYPRESS
+          echo "Waiting for services..."
+          npx wait-on http://localhost:5174 http://localhost:8080/productos --timeout 120000
+      # CY
       - name: Run Cypress
         working-directory: ./ventas-frontend
         run: npm run cypress:ci
 
-      - name: Upload logs on failure
+      - name: Upload logs on fail
         if: failure()
         uses: actions/upload-artifact@v4
         with:
