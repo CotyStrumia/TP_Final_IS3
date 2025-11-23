@@ -9,9 +9,11 @@ import (
 func Setup(r *gin.Engine) {
 
 	// Root health endpoint for readiness checks (returns 200)
-	r.GET("/", func(c *gin.Context) {
+	healthHandler := func(c *gin.Context) {
 		c.String(200, "OK")
-	})
+	}
+	r.GET("/", healthHandler)
+	r.HEAD("/", healthHandler)
 
 	r.POST("/login", controllers.Login)
 	//r.POST("/usuarios", middleware.AuthRequired("precio", "comprador"), controllers.CrearUsuario)
