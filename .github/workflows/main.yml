@@ -215,6 +215,17 @@ jobs:
           sleep 2
           echo "---- frontend log (start) ----"
           tail -n 200 frontend.log || true
+      - name: Debug dist folder
+        working-directory: ./ventas-frontend
+        run: |
+          echo "Verificando contenido en dist/"
+          ls -R dist || echo "NO EXISTE DIST"
+
+      - name: Test direct access to frontend
+        run: |
+          echo "Intentando GET a frontend..."
+          curl -v http://localhost:5174 || true
+      
 
       - name: Wait for services (with diagnostics on failure)
         working-directory: ./ventas-frontend
