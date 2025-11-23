@@ -21,6 +21,7 @@ func Connect() *gorm.DB {
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
 	nombre := os.Getenv("DB_NAME")
+	sslMode := os.Getenv("DB_SSL_MODE")
 
 	// Configurar SSL para Aiven con skip-verify como fallback
 	err := configurarSSLAiven()
@@ -33,19 +34,31 @@ func Connect() *gorm.DB {
 		}
 	}
 
-	// Configuración DSN para Aiven MySQL con SSL
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&tls=custom",
-		usuario, clave, host, port, nombre)
+	var db *gorm.DB
 
-	db, err := gorm.Open(gormMysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		// Fallback: intentar con SSL básico si falla con certificado personalizado
-		log.Printf("Error con SSL personalizado, intentando SSL básico: %v", err)
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&tls=skip-verify",
+	// Si se indica DB_SSL_MODE=disable, conectar sin TLS (útil para CI/local)
+	if sslMode == "disable" {
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
 			usuario, clave, host, port, nombre)
 		db, err = gorm.Open(gormMysql.Open(dsn), &gorm.Config{})
 		if err != nil {
-			log.Fatal("Error al conectar con MySQL (Aiven):", err)
+			log.Fatal("Error al conectar con MySQL (sin TLS):", err)
+		}
+	} else {
+		// Configuración DSN para Aiven MySQL con SSL
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&tls=custom",
+			usuario, clave, host, port, nombre)
+
+		db, err = gorm.Open(gormMysql.Open(dsn), &gorm.Config{})
+		if err != nil {
+			// Fallback: intentar con SSL básico si falla con certificado personalizado
+			log.Printf("Error con SSL personalizado, intentando SSL básico: %v", err)
+			dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&tls=skip-verify",
+				usuario, clave, host, port, nombre)
+			db, err = gorm.Open(gormMysql.Open(dsn), &gorm.Config{})
+			if err != nil {
+				log.Fatal("Error al conectar con MySQL (Aiven):", err)
+			}
 		}
 	}
 
