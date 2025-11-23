@@ -6,9 +6,6 @@ on:
   pull_request:
 
 jobs:
-  # ----------------------------------------------------
-  # CHECK BASIC PIPELINE
-  # ----------------------------------------------------
   check:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +35,23 @@ jobs:
           path: backend-app
 
   # ----------------------------------------------------
+  # TEST BACKEND
+  # ----------------------------------------------------
+  test_backend:
+    runs-on: ubuntu-latest
+    needs: build_backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run backend tests
+        working-directory: ./ventas-app
+        run: go test ./... -v
+
+  # ----------------------------------------------------
   # BUILD FRONTEND
   # ----------------------------------------------------
   build_frontend:
@@ -56,12 +70,36 @@ jobs:
       - run: npm run build
         working-directory: ./ventas-frontend
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: ventas-frontend/dist
+
   # ----------------------------------------------------
-  # E2E CYPRESS (FAST START)
+  # TEST FRONTEND
+  # ----------------------------------------------------
+  test_frontend:
+    runs-on: ubuntu-latest
+    needs: build_frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+        working-directory: ./ventas-frontend
+
+      - run: npm run test:ci
+        working-directory: ./ventas-frontend
+
+  # ----------------------------------------------------
+  # CYPRESS E2E TESTS
   # ----------------------------------------------------
   e2e_tests:
     runs-on: ubuntu-latest
-    needs: [build_backend, build_frontend]  # IMPORTANTE: NO incluir test unitarios
+    needs: [build_backend, build_frontend]
 
     services:
       mysql:
@@ -80,13 +118,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ------ BACKEND ------
+      # BACKEND
       - uses: actions/download-artifact@v4
         with:
           name: backend-app
           path: .
 
-      - name: Create .env files for CI
+      # FRONTEND (dist)
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      # ENV FILES
+      - name: Create envs
         run: |
           echo "DB_HOST=127.0.0.1" > .env.qa
           echo "DB_PORT=3306" >> .env.qa
@@ -96,14 +141,15 @@ jobs:
           echo "DB_SSL_MODE=disable" >> .env.qa
           cp .env.qa .env.prod
 
+      # START BACKEND
       - name: Start backend
         run: |
           chmod +x backend-app
           nohup ./backend-app > backend.log 2>&1 &
-          sleep 2
+          sleep 3
           tail -n 50 backend.log || true
 
-      # ------ FRONTEND ------
+      # START FRONTEND PREVIEW USING dist/
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -111,69 +157,28 @@ jobs:
       - run: npm ci
         working-directory: ./ventas-frontend
 
-      - name: Start frontend preview
-        working-directory: ./ventas-frontend
+      - name: Start preview server using built dist
         run: |
-          nohup npm run preview -- --port 5174 --host 0.0.0.0 > frontend.log 2>&1 &
-          sleep 2
-          tail -n 50 frontend.log || true
+          nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > frontend.log 2>&1 &
+          sleep 3
+          tail -n 80 frontend.log || true
 
-      # ------ WAIT ------
-      - name: Wait for backend and frontend
+      # WAIT
+      - name: Wait for frontend and backend
         run: |
-          echo "Waiting for frontend (5174) AND backend (8080)..."
-          npx wait-on --http-get http://localhost:5174/ http://localhost:8080/productos --timeout 120000
+          echo "Waiting for services..."
+          npx wait-on http://localhost:5174 http://localhost:8080/productos --timeout 120000
 
-      - run: |
-          echo "Listening ports:"
-          ss -ltnp || true
-
-      # ------ CYPRESS ------
+      # CY
       - name: Run Cypress
         working-directory: ./ventas-frontend
         run: npm run cypress:ci
 
-      - name: Upload logs
+      - name: Upload logs on fail
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ci-logs
           path: |
             backend.log
-            ventas-frontend/frontend.log
-
-  # ----------------------------------------------------
-  # TEST BACKEND (DESPUÉS DEL E2E)
-  # ----------------------------------------------------
-  test_backend:
-    runs-on: ubuntu-latest
-    needs: e2e_tests
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-
-      - name: Run backend tests
-        working-directory: ./ventas-app
-        run: go test ./... -v
-
-  # ----------------------------------------------------
-  # TEST FRONTEND (DESPUÉS DEL E2E)
-  # ----------------------------------------------------
-  test_frontend:
-    runs-on: ubuntu-latest
-    needs: e2e_tests
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - run: npm ci
-        working-directory: ./ventas-frontend
-
-      - run: npm run test:ci
-        working-directory: ./ventas-frontend
+            frontend.log
