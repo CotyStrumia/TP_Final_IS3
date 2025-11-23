@@ -7,8 +7,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BACK: ghcr.io/${{ github.repository_owner }}/ventas-back
-  IMAGE_FRONT: ghcr.io/${{ github.repository_owner }}/ventas-front
+  IMAGE_BACK: ghcr.io/${{ github.repository_owner }}/tp_final_is3/ventas-back
+  IMAGE_FRONT: ghcr.io/${{ github.repository_owner }}/tp_final_is3/ventas-front
 
 jobs:
 
