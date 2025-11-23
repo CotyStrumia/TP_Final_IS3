@@ -7,6 +7,12 @@ import (
 )
 
 func Setup(r *gin.Engine) {
+
+	// Root health endpoint for readiness checks (returns 200)
+	r.GET("/", func(c *gin.Context) {
+		c.String(200, "OK")
+	})
+
 	r.POST("/login", controllers.Login)
 	//r.POST("/usuarios", middleware.AuthRequired("precio", "comprador"), controllers.CrearUsuario)
 	r.POST("/usuarios", controllers.CrearUsuario)
