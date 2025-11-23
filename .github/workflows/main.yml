@@ -172,8 +172,8 @@ jobs:
       - name: Wait for services
         run: |
           npx wait-on \
-            http-get://localhost:8080 \
-            http-get://localhost:5174 \
+            tcp:8080 \
+            http://localhost:5174 \
             --timeout 180000
 
       # CYPRESS
