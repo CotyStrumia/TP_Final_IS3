@@ -253,7 +253,7 @@ jobs:
     name: Deploy to QA
     runs-on: ubuntu-latest
     needs: build_and_push_images
-    if: github.ref == 'refs/heads/qa'
+    if: github.ref == 'refs/heads/qa' || github.ref == 'refs/heads/main'
     environment:
       name: qa
     steps:
