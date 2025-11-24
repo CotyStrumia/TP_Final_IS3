@@ -1,9 +1,7 @@
 describe('Acceptance - flujo básico', () => {
-  it('verifica que la app carga y el selector de entorno está presente', () => {
+  it('verifica que la app carga correctamente', () => {
     // Usa baseUrl configurado en CI (QA_URL) o local
     cy.visit('/');
-    // El selector de entorno muestra un label con el emoji y el texto
-    cy.contains('🌐 Entorno actual').should('exist');
     // Aseguramos que el select exista y forzamos entorno QA en localStorage
     cy.window().then((win) => {
       win.localStorage.setItem('entorno', 'qa');

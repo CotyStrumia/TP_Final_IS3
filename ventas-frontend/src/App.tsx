@@ -1,5 +1,4 @@
 import { Routes, Route, Link } from 'react-router-dom'
-import EntornoSelector from './components/EntornoSelector'
 import RoleRoute from './components/RoleRoute'
 
 import Login from './pages/Login'
@@ -14,7 +13,6 @@ function App() {
     return (
         <div style={{ padding: '2rem' }}>
             <h1>🛍️ Ventas App</h1>
-            <EntornoSelector />
             <nav>
                 <Link to="/">Productos</Link>
                 {/* Ventas solo para vendedor */}

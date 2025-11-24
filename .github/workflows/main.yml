@@ -175,7 +175,7 @@ jobs:
 
       - name: Start preview server using built dist
         run: |
-          nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > frontend.log 2>&1 &
+          nohup npx vite preview --port 5174 --host 0.0.0.0 > frontend.log 2>&1 &
           sleep 3
           tail -n 80 frontend.log || true
 
@@ -185,7 +185,8 @@ jobs:
       - name: Wait for frontend and backend
         run: |
           echo "Waiting for services..."
-          npx wait-on tcp:8080 http://localhost:5174 --timeout 180000
+          # wait for frontend HTTP and backend HTTP endpoints to be ready
+          npx wait-on http://localhost:5174 http://localhost:8080 --timeout 180000
 
       # -----------------------------------------
       # CYPRESS
