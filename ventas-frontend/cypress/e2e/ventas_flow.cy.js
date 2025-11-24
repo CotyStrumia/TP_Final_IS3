@@ -24,6 +24,12 @@ describe('Flujos completos de ventas (E2E)', () => {
       body: mockProductos
     }).as('getProductos')
 
+    // Mock POST ventas default (éxito)
+    cy.intercept('POST', '**/ventas', {
+      statusCode: 201,
+      body: { mensaje: 'Venta registrada', id: 1 }
+    }).as('postVenta')
+
     // Login
     cy.visit('/login')
     cy.get('input[placeholder="Email"]').type('vendedor@test.com')
@@ -35,9 +41,10 @@ describe('Flujos completos de ventas (E2E)', () => {
     cy.visit('/ventas')
     cy.contains('Registrar Venta', { timeout: 10000 }).should('be.visible')
 
-    // Esperar que carguen los productos mockeados
     cy.wait('@getProductos')
+
     cy.get('select').first().should('be.visible')
+    cy.get('select option').should('have.length.gt', 1)
   })
 
   function seleccionarPrimerProducto() {
@@ -60,45 +67,77 @@ describe('Flujos completos de ventas (E2E)', () => {
   })
 
   it('3️⃣ Valida stock insuficiente', () => {
-    // Producto C tiene stock 0
-    cy.get('select').first().select('3') // Producto C
-    cy.get('input[type="number"]').first().should('be.disabled')
-    cy.contains('Agregar al carrito').should('be.disabled')
+    cy.get('select').first().select('2') // Producto B (stock 5)
+    cy.get('input[type="number"]').first().clear().type('999')
+    cy.contains('Agregar al carrito').click()
+    cy.contains(/stock insuficiente|insuficiente/i).should('exist')
   })
 
   it('4️⃣ Elimina productos del carrito', () => {
-    seleccionarPrimerProducto()
+    cy.reload()
+    cy.wait('@getProductos')
+    cy.contains('Registrar Venta').should('be.visible')
+
+    // Asegurar que el checkbox de filtrar stock esté desmarcado
+    cy.get('input[type="checkbox"]').uncheck()
+
+    // Agregar primer producto
+    cy.get('select').first().select('4') // Producto D
     cy.get('input[type="number"]').first().clear().type('1')
     cy.contains('Agregar al carrito').click()
+    cy.get('table').contains('Producto D').should('exist')
 
-    cy.contains('🗑️').click()
-    cy.contains('Producto A').should('not.exist')
+    // Agregar segundo producto
+    cy.get('select').first().select('5') // Producto E
+    cy.get('input[type="number"]').first().clear().type('1')
+    cy.contains('Agregar al carrito').click()
+    cy.get('table').contains('Producto E').should('exist')
+
+    // Eliminar el primero
+    cy.get('table').contains('tr', 'Producto D').find('button[title="Eliminar"]').click()
+
+    // Verificar que D ya no está pero E sigue
+    cy.get('table').contains('Producto D').should('not.exist')
+    cy.get('table').contains('Producto E').should('exist')
   })
 
   it('5️⃣ Muestra error sin productos', () => {
     cy.contains('Agregar al carrito').should('be.disabled')
 
-    const existeConfirmar = Cypress.$('button:contains("Confirmar Venta")').length > 0
-    if (existeConfirmar) {
-      cy.contains('Confirmar Venta').should('be.disabled')
-    }
+    // Verificar que no existe botón de confirmar o está deshabilitado
+    cy.get('body').then($body => {
+      if ($body.find('button').filter((_, el) => /confirmar/i.test(el.textContent)).length > 0) {
+        cy.contains('button', /confirmar/i).should('be.disabled')
+      }
+    })
   })
 
   it('6️⃣ Maneja errores del backend', () => {
-    seleccionarPrimerProducto()
+    cy.reload()
+    cy.wait('@getProductos')
+    cy.contains('Registrar Venta').should('be.visible')
+
+    // Asegurar que el checkbox de filtrar stock esté desmarcado
+    cy.get('input[type="checkbox"]').uncheck()
+
+    cy.get('select').first().select('5') // Producto E
     cy.get('input[type="number"]').first().clear().type('1')
     cy.contains('Agregar al carrito').click()
 
-    // Mockear error en venta
+    cy.contains('Producto E').should('exist')
+
+    // Mock error del backend
     cy.intercept('POST', '**/ventas', {
-      statusCode: 400,
-      body: { error: 'Stock insuficiente en el servidor' }
+      statusCode: 500,
+      body: { error: 'Error interno del servidor' }
     }).as('errVenta')
 
-    cy.contains('Confirmar Venta').click()
+    // Botón flexible (💰 Confirmar Venta) - esperar a que esté habilitado
+    cy.contains('button', /confirmar/i).should('be.visible').and('not.be.disabled').click()
     cy.wait('@errVenta')
 
-    cy.contains('insuficiente').should('exist')
+    cy.contains(/error/i).should('exist')
+    cy.contains('Producto E').should('exist')
   })
 
   it('7️⃣ Test básico', () => {

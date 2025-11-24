@@ -199,8 +199,9 @@ jobs:
       - name: Serve frontend
         run: |
           npm ci --prefix ventas-frontend
-          echo "Starting Vite Preview..."
-          nohup npx vite preview --port 5174 --host 0.0.0.0 > frontend.log 2>&1 &
+          echo "Starting Vite dev server on port 5173..."
+          # Start Vite dev server in background (CI) so Cypress can visit the app
+          nohup npm --prefix ventas-frontend run dev -- --port 5173 --host 0.0.0.0 > frontend.log 2>&1 &
           sleep 5
           tail -n 80 frontend.log || true
 
@@ -209,7 +210,7 @@ jobs:
       ###################################################
       - name: Wait for backend & frontend
         run: |
-          npx wait-on http://localhost:8080/productos http://localhost:5174 --timeout 180000
+          npx wait-on http://localhost:8080/productos http://localhost:5173 --timeout 180000
 
       ###################################################
       # CYPRESS
@@ -217,7 +218,7 @@ jobs:
       - name: Run Cypress
         working-directory: ./ventas-frontend
         env:
-          CYPRESS_BASE_URL: "http://localhost:5174"
+          CYPRESS_BASE_URL: "http://localhost:5173"
           CYPRESS_CI: "true"
         run: npm run cypress:ci
 
