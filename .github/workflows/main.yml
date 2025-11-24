@@ -198,10 +198,11 @@ jobs:
         working-directory: ./ventas-frontend
 
       - name: Start preview server using built dist
+        working-directory: ./ventas-frontend
         run: |
-          nohup npx vite preview --port 5174 --host 0.0.0.0 > frontend.log 2>&1 &
+          nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > ../frontend.log 2>&1 &
           sleep 3
-          tail -n 80 frontend.log || true
+          tail -n 80 ../frontend.log || true
 
       # -----------------------------------------
       # WAIT
