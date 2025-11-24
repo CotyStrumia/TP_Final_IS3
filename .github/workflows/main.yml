@@ -105,7 +105,7 @@ jobs:
       - run: npm run test:ci
         working-directory: ./ventas-frontend
  
-        
+
   # ----------------------------------------------------
   # CYPRESS E2E TESTS
   # ----------------------------------------------------
@@ -159,10 +159,17 @@ jobs:
       # -----------------------------------------
       - name: Start backend
         run: |
+          echo "=== Starting Backend with env vars ==="
           chmod +x backend-app
+          DB_HOST=127.0.0.1 \
+          DB_PORT=3306 \
+          DB_USER=root \
+          DB_PASS=rootpass \
+          DB_NAME=ventas \
+          DB_SSL_MODE=disable \
           nohup ./backend-app > backend.log 2>&1 &
-          sleep 5
-          tail -n 50 backend.log || true
+          sleep 6
+          tail -n 100 backend.log || true
 
       # -----------------------------------------
       # FRONTEND PREVIEW USING dist/
