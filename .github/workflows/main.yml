@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@v4
 
       ###################################################
-      # BAJAR ARTIFACTS
+      # DOWNLOAD ARTIFACTS
       ###################################################
       - uses: actions/download-artifact@v4
         with:
@@ -142,6 +142,7 @@ jobs:
         with:
           name: frontend-dist
           path: dist
+
       ###################################################
       # MYSQL CLIENT
       ###################################################
@@ -151,7 +152,7 @@ jobs:
           sudo apt-get install -y default-mysql-client
 
       ###################################################
-      # ESPERAR MYSQL + SEED
+      # WAIT FOR MYSQL + (OPTIONAL) SEED
       ###################################################
       - name: Wait for MySQL and seed database
         run: |
@@ -165,7 +166,7 @@ jobs:
           mysql -h127.0.0.1 -uroot -prootpass ventas < db/ventas-app.sql || true
 
       ###################################################
-      # LEVANTAR BACKEND (CONFIG COMPLETA)
+      # START BACKEND
       ###################################################
       - name: Start Backend
         env:
@@ -188,7 +189,7 @@ jobs:
           tail -n 80 backend.log || true
 
       ###################################################
-      # SERVIR FRONTEND DIST (CON API URL FORZADA)
+      # START FRONTEND PREVIEW
       ###################################################
       - name: Install Node for preview
         uses: actions/setup-node@v4
@@ -204,7 +205,7 @@ jobs:
           tail -n 80 frontend.log || true
 
       ###################################################
-      # WAIT-ON PARA AMBOS SERVICIOS
+      # WAIT-ON FOR BACKEND & FRONTEND
       ###################################################
       - name: Wait for backend & frontend
         run: |
@@ -217,10 +218,11 @@ jobs:
         working-directory: ./ventas-frontend
         env:
           CYPRESS_BASE_URL: "http://localhost:5174"
+          CYPRESS_CI: "true"
         run: npm run cypress:ci
 
       ###################################################
-      # LOGS EN CASO DE ERROR
+      # UPLOAD LOGS ON FAIL
       ###################################################
       - name: Upload logs on fail
         if: failure()
@@ -230,7 +232,6 @@ jobs:
           path: |
             backend.log
             frontend.log
-
 
 
   # ----------------------------------------------------
