@@ -130,37 +130,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # BACKEND BINARY
+      #############################
+      #  BACKEND BINARY
+      #############################
       - uses: actions/download-artifact@v4
         with:
           name: backend-app
           path: .
 
-      # FRONTEND DIST
+      #############################
+      #  FRONTEND DIST
+      #############################
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: dist
 
-      # -----------------------------------------
-      # BACKEND ENVS
-      # -----------------------------------------
-      - name: Set backend envs for CI
+      #############################
+      #  INSTALL MYSQL CLIENT
+      #############################
+      - name: Install MySQL client
         run: |
-          echo "DB_HOST=127.0.0.1" >> $GITHUB_ENV
-          echo "DB_PORT=3306" >> $GITHUB_ENV
-          echo "DB_USER=root" >> $GITHUB_ENV
-          echo "DB_PASS=rootpass" >> $GITHUB_ENV
-          echo "DB_NAME=ventas" >> $GITHUB_ENV
-          echo "DB_SSL_MODE=disable" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
 
-      # -----------------------------------------
-      # START BACKEND
-      # -----------------------------------------
-      - name: Start backend
+      #############################
+      #  SEED DATABASE
+      #############################
+      - name: Wait for MySQL and seed database
         run: |
-          echo "=== Starting Backend with env vars ==="
+          echo "Waiting for MySQL..."
+          for i in $(seq 1 40); do
+            mysql -h127.0.0.1 -uroot -prootpass -e "SELECT 1" && break
+            sleep 2
+          done
+          echo "Importing seed SQL..."
+          mysql -h127.0.0.1 -uroot -prootpass ventas < db/ventas-app.sql || true
+
+
+      #############################
+      #  START BACKEND (CON ENV!)
+      #############################
+      - name: Start Backend with ENV vars
+        run: |
           chmod +x backend-app
+          echo "=== Starting backend with ENV ==="
           DB_HOST=127.0.0.1 \
           DB_PORT=3306 \
           DB_USER=root \
@@ -169,12 +183,12 @@ jobs:
           DB_SSL_MODE=disable \
           nohup ./backend-app > backend.log 2>&1 &
           sleep 6
-          tail -n 100 backend.log || true
+          echo "=== Backend LOGS ==="
+          tail -n 80 backend.log || true
 
-      # -----------------------------------------
-      # FRONTEND PREVIEW USING dist/
-      # (versión ORIGINAL que funcionaba)
-      # -----------------------------------------
+      #############################
+      #  START FRONTEND PREVIEW
+      #############################
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -182,28 +196,23 @@ jobs:
       - run: npm ci
         working-directory: ./ventas-frontend
 
-      - name: Create .env for Cypress
-        working-directory: ./ventas-frontend
+      - name: Start Vite Preview
         run: |
-          echo "VITE_API_URL=http://localhost:8080" > .env
-
-      - name: Start preview server using built dist
-        run: |
-          nohup npx vite preview --port 5174 --host 0.0.0.0 --outDir dist > frontend.log 2>&1 &
+          nohup npx vite preview --port 5174 --host 0.0.0.0 > frontend.log 2>&1 &
           sleep 5
           tail -n 80 frontend.log || true
 
-      # -----------------------------------------
-      # WAIT FRONTEND + BACKEND
-      # -----------------------------------------
-      - name: Wait for frontend and backend
+      #############################
+      #  WAIT FOR BOTH SERVICES
+      #############################
+      - name: Wait for backend and frontend
         run: |
-          echo "Waiting for services..."
-          npx wait-on http-get://localhost:5174 http-get://localhost:8080 --timeout 180000
+          echo "Waiting for backend and frontend..."
+          npx wait-on http://localhost:8080/productos http://localhost:5174 --timeout 180000
 
-      # -----------------------------------------
-      # CYPRESS
-      # -----------------------------------------
+      #############################
+      #  CYPRESS
+      #############################
       - name: Run Cypress
         working-directory: ./ventas-frontend
         run: npm run cypress:ci
