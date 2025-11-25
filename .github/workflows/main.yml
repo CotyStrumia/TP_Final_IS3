@@ -269,7 +269,7 @@ jobs:
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-back:release 
 
-      # ---- FRONTEND IMAGE (UNA SOLA BUILD)
+      # ---- FRONTEND IMAGE (QA/Prod) ----
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
         with:
@@ -277,6 +277,8 @@ jobs:
           file: ./ventas-frontend/Dockerfile
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-front:release
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL_QA }}
 
   # ----------------------------------------------------
   # DEPLOY QA (AUTOMÁTICO)
