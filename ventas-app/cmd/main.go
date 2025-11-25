@@ -12,36 +12,55 @@ import (
 )
 
 func main() {
-	// Este valor ya no es necesario si usás GetDB por request
+
+	// Detectar entorno
 	env := os.Getenv("APP_ENV")
 
-	// Si es CI, forzamos entorno "ci"
+	// Si es CI → forzar entorno de pruebas
 	if os.Getenv("CI") == "true" {
 		env = "ci"
 	}
 
+	// Si no viene nada, asumimos QA (Render QA)
 	if env == "" {
-		env = "qa" // fallback por defecto (Render QA)
+		env = "qa"
 	}
 
 	fmt.Println("Iniciando backend en entorno:", env)
 
-	config.LoadEnv(env) // carga env.<app_env>
+	// Cargar variables según entorno
+	config.LoadEnv(env)
 
-	database.Connect() // <- conecta según env actual
+	// Conectar BD
+	database.Connect()
 
+	// Iniciar servidor
 	r := gin.Default()
-	fmt.Println("Conexión establecida para QA y PROD", env)
 
+	fmt.Println("Conexión establecida para:", env)
+
+	// ================
+	//   🔥 CORS FIX
+	// ================
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5174"},
+		AllowOrigins: []string{
+			// FRONT LOCALES (para Vite y Cypress)
+			"http://localhost:5173",
+			"http://localhost:5174",
+
+			// FRONT QA y PROD (Render)
+			"https://frontqa-t0a9.onrender.com",
+			"https://frontprod-uu5g.onrender.com",
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Env"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
 
+	// Rutas
 	routes.Setup(r)
 
+	// Puerto fijo (Render usa ese puerto)
 	r.Run(":8080")
 }
