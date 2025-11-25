@@ -1,12 +1,14 @@
 import axios from 'axios'
 
-const baseURL =
-  import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== ''
-    ? import.meta.env.VITE_API_URL
-    : 'http://localhost:8080'
+const baseURL = import.meta.env.VITE_API_URL
+
+if (!baseURL) {
+  console.error("❌ ERROR: VITE_API_URL no está configurado en este entorno.")
+  throw new Error("VITE_API_URL es obligatorio. Configuralo en Render o en un .env.local")
+}
 
 const api = axios.create({
-  baseURL: baseURL,
+  baseURL
 })
 
 api.interceptors.request.use((config) => {
