@@ -1,19 +1,17 @@
-import axios from 'axios'
+import axios from "axios";
 
-// 1) Obtener la URL del entorno (Render la pone en build)
-const envURL = import.meta.env.VITE_API_URL
+const apiURL =
+  // ⭐ Cuando Vite compila en Render: viene VITE_API_URL → se usa
+  import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== ""
+    ? import.meta.env.VITE_API_URL
+    : // ⭐ Cuando corre en Cypress o en tu máquina → fallback
+      "http://localhost:8080";
 
-// 2) Elegimos qué base usar
-// Render: usa envURL
-// Cypress/local: usa localhost
-const baseURL = envURL && envURL.trim() !== ""
-  ? envURL
-  : "http://localhost:8080"
+console.log("API URL usada:", apiURL);
 
-// 3) Crear instancia axios
 const api = axios.create({
-  baseURL
-})
+  baseURL: apiURL,
+});
 
 // 4) Token (normal)
 api.interceptors.request.use((config) => {

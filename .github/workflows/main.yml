@@ -292,8 +292,7 @@ jobs:
           file: ./ventas-frontend/Dockerfile
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-front:release
-          build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL_QA }}
+         
 
   # ----------------------------------------------------
   # DEPLOY QA (AUTOMÁTICO)
