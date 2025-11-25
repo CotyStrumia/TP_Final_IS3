@@ -49,8 +49,8 @@ func main() {
 		// QA
 		"https://frontqa-t0a9.onrender.com",
 
-		// PRODUCCIÓN REAL
-		"https://frontprod.onrender.com",
+		// PROD (OJO: ESTA es la correcta según Render)
+		"https://frontqa.onrender.com",
 	}
 
 	r.Use(cors.New(cors.Config{
