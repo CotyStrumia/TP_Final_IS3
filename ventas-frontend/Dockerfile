@@ -1,3 +1,4 @@
+# -------- STAGE 1: Build --------
 FROM node:20-slim AS builder
 WORKDIR /app
 
@@ -6,11 +7,13 @@ RUN npm ci
 
 COPY . .
 
-# Generamos .env.production usando la variable de entorno
-RUN echo "VITE_API_URL=$VITE_API_URL" > .env.production
+# ⬅️ Crear un .env con la variable de entorno de Render
+RUN echo "VITE_API_URL=$VITE_API_URL" > .env
 
 RUN npm run build
 
+
+# -------- STAGE 2: Serve --------
 FROM node:20-slim
 WORKDIR /app
 
