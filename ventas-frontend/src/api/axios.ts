@@ -1,27 +1,34 @@
 import axios from "axios";
 
+let runtimeURL = "";
+
+// Cargamos config.json en runtime
+async function loadConfig() {
+  try {
+    const res = await fetch("/config.json", { cache: "no-store" });
+    const json = await res.json();
+    runtimeURL = json.api_url || "";
+  } catch (err) {
+    console.warn("No se pudo cargar config.json, usando fallback.");
+  }
+}
+await loadConfig();
+
 const apiURL =
-  // ⭐ Cuando Vite compila en Render: viene VITE_API_URL → se usa
-  import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== ""
-    ? import.meta.env.VITE_API_URL
-    : // ⭐ Cuando corre en Cypress o en tu máquina → fallback
-      "http://localhost:8080";
+  runtimeURL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8080";
 
 console.log("API URL usada:", apiURL);
 
-const api = axios.create({
-  baseURL: apiURL,
+const api = axios.create({ baseURL: apiURL });
+
+// Token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  config.headers = config.headers || {};
+  if (token) config.headers["Authorization"] = `Bearer ${token}`;
+  return config;
 });
 
-// 4) Token (normal)
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  config.headers = config.headers || {}
-  if (token) config.headers["Authorization"] = `Bearer ${token}`
-  return config
-})
-
-console.log("API URL usada:", import.meta.env.VITE_API_URL)
-
-
-export default api
+export default api;

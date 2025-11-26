@@ -3,31 +3,25 @@ FROM node:20 AS builder
 
 WORKDIR /app
 
-# Instalamos dependencias con caché eficiente
+# Instalamos dependencias con cache correcto
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copiamos el resto del código
+# Copiamos el resto del proyecto (incluye public/config.json)
 COPY . .
 
-# Variables recibidas desde GitHub Actions
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
-ENV NODE_ENV=production
-
-# Build del frontend usando la variable correcta
+# Build del frontend (con config.json ya inyectado por GH Actions)
 RUN npm run build
-
 
 # ---------- STAGE 2: Static Server ----------
 FROM node:20-slim
 
 WORKDIR /app
 
-# Servidor estático liviano
+# Instalamos servidor estático
 RUN npm install -g serve
 
-# Traemos solo la carpeta dist
+# Copiamos la carpeta dist final
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000

@@ -2,7 +2,7 @@ name: CI - Test, Build, Cypress & Push
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "qa"]
   pull_request:
 
 concurrency:
@@ -50,9 +50,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+
       - name: Build backend binary
         working-directory: ./ventas-app
         run: go build -o ../backend-app ./cmd/main.go
+
       - uses: actions/upload-artifact@v4
         with:
           name: backend-app
@@ -69,13 +71,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - run: npm ci
         working-directory: ./ventas-frontend
+
       - run: npm run test:ci
         working-directory: ./ventas-frontend
 
   # ----------------------------------------------------
-  # BUILD FRONTEND (SIEMPRE PARA QA — Cypress usa esto)
+  # BUILD FRONTEND (CYPRESS PREVIEW)
   # ----------------------------------------------------
   build_frontend:
     runs-on: ubuntu-latest
@@ -86,18 +90,19 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Inject QA API
+      # Solo para Cypress (esto NO es el build final)
+      - name: Inject QA API (for Cypress)
         working-directory: ./ventas-frontend
         run: |
           echo "VITE_API_URL=${{ secrets.VITE_API_URL_QA }}" >> .env
-          echo "Usando API QA para Cypress:"
+          echo "Usando API QA para Cypress preview:"
           cat .env
 
       - name: Install deps
         working-directory: ./ventas-frontend
         run: npm ci
 
-      - name: Build frontend (QA)
+      - name: Build frontend (Cypress preview)
         working-directory: ./ventas-frontend
         run: npm run build
 
@@ -197,11 +202,11 @@ jobs:
 
 
   # ----------------------------------------------------
-  # BUILD & PUSH DOCKER IMAGES (QA BUILD)
+  # BUILD & PUSH DOCKER IMAGES (UNA SOLA IMAGEN)
   # ----------------------------------------------------
-  build_and_push_qa:
+  build_and_push_images:
     runs-on: ubuntu-latest
-    needs: e2e_tests
+    needs: [e2e_tests]
     permissions:
       contents: read
       packages: write
@@ -215,17 +220,30 @@ jobs:
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Build & Push Frontend QA Image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./ventas-frontend
-          file: ./ventas-frontend/Dockerfile
-          push: true
-          tags: ghcr.io/cotystrumia/tp_final_is3-front:qa
-          build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL_QA }}
+      # ⭐⭐⭐ AQUI VIENE LO IMPORTANTE: COPIAMOS EL CONFIG QA O PROD ⭐⭐⭐
+      - name: Inject config.json (QA or PROD)
+        working-directory: ./ventas-frontend
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/qa" ]]; then
+            echo "Usando config.qa.json"
+            cp config.qa.json public/config.json
+          else
+            echo "Usando config.prod.json"
+            cp config.prod.json public/config.json
+          fi
 
-      - name: Build & Push Backend Image (PROD/QA SAME)
+          echo "Contenido final de config.json:"
+          cat public/config.json
+
+      # ⭐ Luego hacemos el build definitivo que irá al DOCKER ⭐
+      - name: Build frontend final
+        working-directory: ./ventas-frontend
+        run: |
+          npm ci
+          npm run build
+
+      # ----------- Backend Image ----------
+      - name: Build & Push Backend Image
         uses: docker/build-push-action@v6
         with:
           context: ./ventas-app
@@ -233,15 +251,26 @@ jobs:
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-back:release
 
+      # ----------- Frontend Image ----------
+      - name: Build & Push Frontend Image (ONE IMAGE)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ventas-frontend
+          file: ./ventas-frontend/Dockerfile
+          push: true
+          tags: ghcr.io/cotystrumia/tp_final_is3-front:release
+
+
   # ----------------------------------------------------
-  # DEPLOY QA AUTOMÁTICO
+  # DEPLOY QA (USA MISMA IMAGEN)
   # ----------------------------------------------------
   deploy_qa:
     runs-on: ubuntu-latest
-    needs: build_and_push_qa
+    needs: build_and_push_images
     steps:
       - name: Deploy Backend QA
         run: curl -fsSL -X POST "${{ secrets.RENDER_BACK_QA_HOOK }}" || true
+
       - name: Deploy Frontend QA
         run: curl -fsSL -X POST "${{ secrets.RENDER_FRONT_QA_HOOK }}" || true
 
@@ -250,7 +279,8 @@ jobs:
   # ----------------------------------------------------
   approve_prod:
     runs-on: ubuntu-latest
-    needs: build_and_push_qa
+    needs: build_and_push_images
+    if: github.ref == 'refs/heads/main'
     environment:
       name: production
       url: https://tp8-front-prod-tn48.onrender.com
@@ -258,40 +288,11 @@ jobs:
       - run: echo "Esperando aprobación manual..."
 
   # ----------------------------------------------------
-  # BUILD & PUSH DOCKER IMAGES (PROD BUILD)
-  # ----------------------------------------------------
-  build_and_push_prod:
-    runs-on: ubuntu-latest
-    needs: approve_prod
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USER }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Build & Push Frontend PROD Image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./ventas-frontend
-          file: ./ventas-frontend/Dockerfile
-          push: true
-          tags: ghcr.io/cotystrumia/tp_final_is3-front:release
-          build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL_PROD }}
-
-  # ----------------------------------------------------
   # DEPLOY PROD
   # ----------------------------------------------------
   deploy_prod:
     runs-on: ubuntu-latest
-    needs: build_and_push_prod
+    needs: approve_prod
     steps:
       - name: Deploy Backend PROD
         run: curl -fsSL -X POST "${{ secrets.RENDER_BACK_PROD_HOOK }}" || true
