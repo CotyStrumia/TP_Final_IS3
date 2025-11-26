@@ -252,7 +252,7 @@ jobs:
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-front:release
           build-args: |
-             VITE_API_URL=${{ secrets.VITE_API_URL_QA }}
+              VITE_API_URL=${{ github.ref == 'refs/heads/qa' && secrets.VITE_API_URL_QA || secrets.VITE_API_URL_PROD }}
 
   # ----------------------------------------------------
   # DEPLOY QA
