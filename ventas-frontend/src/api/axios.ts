@@ -1,52 +1,54 @@
 import axios, { AxiosInstance } from "axios";
 
-let api: AxiosInstance | null = null;
+let apiInstance: AxiosInstance | null = null;
+let loadingPromise: Promise<void> | null = null;
 
-// URL por defecto
-let finalURL = import.meta.env.VITE_API_URL || "http://localhost:8080";
-
-// Cargar config.json en runtime
-async function loadRuntimeConfig() {
+// Cargar config.json una sola vez
+async function loadConfigJson() {
   try {
     const res = await fetch("/config.json", { cache: "no-store" });
-
-    if (res.ok) {
-      const json = await res.json();
-      if (json.api_url) {
-        finalURL = json.api_url;
-      }
-    } else {
-      console.warn("config.json no encontrado, usando fallback.");
-    }
+    const json = await res.json();
+    return json.api_url || null;
   } catch (err) {
     console.warn("No se pudo cargar config.json, usando fallback.");
+    return null;
   }
 }
 
-// Inicializar API (se llama una sola vez)
-async function initAPI() {
-  if (api) return api; // ya inicializado
+// Inicializar Axios (solo una vez)
+async function init() {
+  if (apiInstance) return; // ya inicializado
 
-  await loadRuntimeConfig();
+  const runtimeURL = await loadConfigJson();
+  const finalURL =
+    runtimeURL ||
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:8080";
 
   console.log("API URL usada:", finalURL);
 
-  api = axios.create({
+  apiInstance = axios.create({
     baseURL: finalURL,
   });
 
-  // Interceptor de token
-  api.interceptors.request.use((config) => {
+  apiInstance.interceptors.request.use((config) => {
     const token = localStorage.getItem("token");
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
+    config.headers = config.headers || {};
+    if (token) config.headers["Authorization"] = `Bearer ${token}`;
     return config;
   });
-
-  return api;
 }
 
-// Exportamos la función (no la instancia directa)
-export default initAPI;
+// API que devuelve SIEMPRE un AxiosInstance válido
+async function getAPI(): Promise<AxiosInstance> {
+  if (!loadingPromise && !apiInstance) {
+    loadingPromise = init();
+  }
+  if (loadingPromise) {
+    await loadingPromise;
+    loadingPromise = null;
+  }
+  return apiInstance!;
+}
+
+export default getAPI;
