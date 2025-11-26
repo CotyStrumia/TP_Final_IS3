@@ -5,12 +5,13 @@ export default {
     setupFilesAfterEnv: ['./setupTests.ts'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/sr/$1',
+        // Mock MSW completamente para evitar problemas ESM
+        '^msw/node$': '<rootDir>/__mocks__/msw.js',
     },
     transform: {
         '^.+\\.tsx?$': 'ts-jest',
     },
-    // Transformar msw y sus dependencias ESM que vienen en node_modules
-    transformIgnorePatterns: ["node_modules/(?!(msw|@mswjs|until-async)/)"],
+    transformIgnorePatterns: ["node_modules/"],
     collectCoverage: true,
     coverageDirectory: 'coverage',
     testMatch: ['**/tests/**/*.test.ts?(x)'],

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90% </span>
+                <span class="strong">90.9% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>9/10</span>
+                <span class='fraction'>10/11</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80% </span>
+                <span class="strong">83.33% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/5</span>
+                <span class='fraction'>5/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90% </span>
+                <span class="strong">90.9% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/10</span>
+                <span class='fraction'>10/11</span>
             </div>
         
             
@@ -87,24 +87,32 @@
 <a name='L22'></a><a href='#L22'>22</a>
 <a name='L23'></a><a href='#L23'>23</a>
 <a name='L24'></a><a href='#L24'>24</a>
-<a name='L25'></a><a href='#L25'>25</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -113,36 +121,40 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useEffect, useState } from 'react'
 import api from '../api/axios'
+import { AxiosResponse, AxiosError } from 'axios'
 &nbsp;
 export default function Productos() {
-    const [productos, setProductos] = useState([])
+  const [productos, setProductos] = useState&lt;any[]&gt;([])
 &nbsp;
-    useEffect(() =&gt; {
-        api.get('/productos')
-            .then(res =&gt; setProductos(res.data))
-            .catch(<span class="fstat-no" title="function not covered" >err </span>=&gt; <span class="cstat-no" title="statement not covered" >console.error(err))</span>
-    }, [])
+  useEffect(() =&gt; {
+    api().then(apiInstance =&gt; {
+      apiInstance.get("/productos")
+        .then((res: AxiosResponse) =&gt; setProductos(res.data))
+        .catch(<span class="fstat-no" title="function not covered" >(e</span>rr: AxiosError) =&gt; <span class="cstat-no" title="statement not covered" >console.error(err))</span>
+    })
+  }, [])
 &nbsp;
-    return (
-        &lt;div&gt;
-            &lt;h2&gt;📦 Productos&lt;/h2&gt;
-            &lt;ul&gt;
-                {productos.map((p: any) =&gt; (
-                    &lt;li key={p.id}&gt;
-                        {p.nombre} — ${p.precio} — Stock: {p.stock}
-                    &lt;/li&gt;
-                ))}
-            &lt;/ul&gt;
-        &lt;/div&gt;
-    )
-}</pre></td></tr></table></pre>
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;📦 Productos&lt;/h2&gt;
+      &lt;ul&gt;
+        {productos.map((p: any) =&gt; (
+          &lt;li key={p.id}&gt;
+            {p.nombre} – ${p.precio} – Stock: {p.stock}
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  )
+}
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-17T16:17:47.134Z
+                at 2025-11-26T12:21:14.781Z
             </div>
         <script src="../prettify.js"></script>
         <script>

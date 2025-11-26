@@ -11,5 +11,5 @@
     "jsx": "react-jsx",
     "types": ["jest", "node"]
   },
-  "include": ["src", "tests", "setupTests.ts"]
+  "include": ["src", "tests", "src/setupTests.ts"]
 }
