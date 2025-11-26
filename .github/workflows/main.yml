@@ -86,7 +86,7 @@ jobs:
 
       - run: npm run test:ci
         working-directory: ./ventas-frontend
-        
+
   # ----------------------------------------------------
   # BUILD FRONTEND (CYPRESS PREVIEW)
   # ----------------------------------------------------
@@ -220,12 +220,6 @@ jobs:
         with:
           name: go-coverage
           path: ventas-app
-
-      - name: Download JS coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: js-coverage
-          path: ventas-frontend/coverage
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
