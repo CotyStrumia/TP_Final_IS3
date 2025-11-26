@@ -7,26 +7,27 @@ import (
 )
 
 var GetDB func(c *gin.Context) DBHandler = func(c *gin.Context) DBHandler {
-
-	// 1. Si estamos en CI, usamos la DB de CI directamente
+	// 1) Determinar entorno actual del servidor
+	current := os.Getenv("APP_ENV")
 	if os.Getenv("CI") == "true" {
-		db := DBs["ci"]
-		if db == nil {
-			panic("Base de datos CI no inicializada")
+		current = "ci"
+	}
+	if current == "" {
+		current = "qa"
+	}
+
+	// 2) Permitir override opcional vía header si existe y está inicializado
+	headerEnv := c.GetHeader("X-Env")
+	selected := current
+	if headerEnv != "" {
+		if _, ok := DBs[headerEnv]; ok {
+			selected = headerEnv
 		}
-		return &GormDB{DB: db}
 	}
 
-	// 2. Caso contrario: seguir usando selector por header (tu lógica original)
-	env := c.GetHeader("X-Env")
-	if env != "prod" {
-		env = "qa"
-	}
-
-	db := DBs[env]
+	db := DBs[selected]
 	if db == nil {
-		panic("Base de datos no inicializada para entorno: " + env)
+		panic("Base de datos no inicializada para entorno: " + selected)
 	}
-
 	return &GormDB{DB: db}
 }
