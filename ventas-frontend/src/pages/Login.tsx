@@ -8,7 +8,8 @@ export default function Login() {
 
     const handleLogin = async () => {
         try {
-            const res = await api.post('/login', { nombre: email, clave: password })
+            const apiInstance = await api()
+            const res = await apiInstance.post('/login', { nombre: email, clave: password })
             localStorage.setItem('token', res.data.token)
             localStorage.setItem('rol', res.data.rol)
             window.location.href = '/'

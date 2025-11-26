@@ -19,7 +19,8 @@ export default function CrearUsuario() {
         setExito('')
         try {
             const token = localStorage.getItem('token')
-            await api.post('/usuarios', { nombre, clave, rol: rolNuevo }, {
+            const apiInstance = await api()
+            await apiInstance.post('/usuarios', { nombre, clave, rol: rolNuevo }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             setExito('✅ Usuario creado con éxito')

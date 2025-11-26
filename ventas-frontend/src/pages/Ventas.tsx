@@ -32,7 +32,8 @@ export default function Ventas() {
         const fetchProductos = async () => {
             try {
                 setLoading(true)
-                const res = await api.get('/productos')
+                const apiInstance = await api()
+                const res = await apiInstance.get('/productos')
                 // Normalizamos por si el backend usa otras claves o tipos
                 const normalizados: Producto[] = (res.data || []).map((raw: any) => ({
                     id: Number(
@@ -118,6 +119,7 @@ export default function Ventas() {
             const usuarioId = 1 // TODO: reemplazar por el ID real del usuario (auth)
 
             // Enviamos UNA request por cada item, en el formato que espera tu back
+            const apiInstance = await api()
             const operaciones = items.map((item) => {
                 const body = {
                     usuario_id: usuarioId,
@@ -126,7 +128,7 @@ export default function Ventas() {
                     descuento: item.descuento
                 }
                 console.log('Enviando item:', body)
-                return api.post('/ventas', body)
+                return apiInstance.post('/ventas', body)
             })
 
             await Promise.all(operaciones)
@@ -135,7 +137,8 @@ export default function Ventas() {
             setItems([])
 
             // Recargar productos (stock actualizado)
-            const resProductos = await api.get('/productos')
+            const apiInstance2 = await api()
+            const resProductos = await apiInstance2.get('/productos')
             const normalizados: Producto[] = (resProductos.data || []).map((raw: any) => ({
                 id: Number(raw.id ?? raw.ID ?? raw.producto_id ?? raw.productoId),
                 nombre: String(raw.nombre ?? raw.name ?? raw.descripcion ?? 'Sin nombre'),

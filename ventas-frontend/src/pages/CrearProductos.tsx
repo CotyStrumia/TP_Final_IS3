@@ -24,7 +24,8 @@ export default function CrearProductos() {
 
         try {
             const token = localStorage.getItem('token')
-            await api.post('/productos', { nombre, precio, stock }, {
+            const apiInstance = await api()
+            await apiInstance.post('/productos', { nombre, precio, stock }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             setExito('✅ Producto creado con éxito')
