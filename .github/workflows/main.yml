@@ -238,16 +238,15 @@ jobs:
 
       - name: Set API URL for Docker Build
         id: apiurl
+        env:
+          REF: ${{ github.ref }}
         run: |
-          echo "Branch: $BRANCH"
+          echo "Rama detectada: $REF"
 
-          if [[ "$BRANCH" == "refs/heads/qa" ]]; then
+          if [[ "$REF" == "refs/heads/qa" ]]; then
             echo "url=${{ secrets.VITE_API_URL_QA }}" >> $GITHUB_OUTPUT
           else
             echo "url=${{ secrets.VITE_API_URL_PROD }}" >> $GITHUB_OUTPUT
-          fi
-        env:
-          BRANCH: ${{ github.ref }}
 
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
