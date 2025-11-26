@@ -210,7 +210,7 @@ jobs:
           CYPRESS_CI: "true"
         run: npm run cypress:ci
 
-  # ----------------------------------------------------
+   # ----------------------------------------------------
   # BUILD & PUSH DOCKER IMAGES
   # ----------------------------------------------------
   build_and_push_images:
@@ -236,13 +236,14 @@ jobs:
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Build & Push Backend Image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./ventas-app
-          file: ./ventas-app/Dockerfile
-          push: true
-          tags: ghcr.io/cotystrumia/tp_final_is3-back:release 
+      - name: Set API URL for Docker Build
+        id: apiurl
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/qa" ]]; then
+            echo "url=${{ secrets.VITE_API_URL_QA }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=${{ secrets.VITE_API_URL_PROD }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v6
@@ -252,7 +253,8 @@ jobs:
           push: true
           tags: ghcr.io/cotystrumia/tp_final_is3-front:release
           build-args: |
-              VITE_API_URL=${{ github.ref == 'refs/heads/qa' && secrets.VITE_API_URL_QA || secrets.VITE_API_URL_PROD }}
+             VITE_API_URL=${{ steps.apiurl.outputs.url }}
+
 
   # ----------------------------------------------------
   # DEPLOY QA
