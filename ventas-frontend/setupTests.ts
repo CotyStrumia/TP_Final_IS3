@@ -8,9 +8,12 @@ import { TextEncoder, TextDecoder } from 'node:util';
 try {
   const { server } = require('./src/mocks/server');
   
+  // @ts-ignore - Jest globals
   beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+  // @ts-ignore - Jest globals
   afterEach(() => server.resetHandlers());
+  // @ts-ignore - Jest globals
   afterAll(() => server.close());
-} catch (e) {
-  console.warn('MSW server not available, tests will use mocks');
+} catch (e: unknown) {
+  console.warn('MSW server not available, tests will use mocks', e);
 }

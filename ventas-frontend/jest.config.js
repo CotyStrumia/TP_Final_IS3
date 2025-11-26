@@ -12,6 +12,7 @@ export default {
         '^.+\\.tsx?$': 'ts-jest',
     },
     transformIgnorePatterns: ["node_modules/"],
+    modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/src/.+\\.js$'],
     collectCoverage: true,
     coverageDirectory: 'coverage',
     testMatch: ['**/tests/**/*.test.ts?(x)'],
