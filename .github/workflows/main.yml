@@ -198,6 +198,36 @@ jobs:
         run: npm run cypress:ci
 
   # ----------------------------------------------------
+  # SonarQube Scan
+  # ----------------------------------------------------
+  sonarcloud:
+    name: SonarCloud Analysis
+    needs: [build_backend, build_frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Go coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: go-coverage
+          path: ventas-app
+
+      - name: Download JS coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: js-coverage
+          path: ventas-frontend/coverage
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  
+
+  # ----------------------------------------------------
   # BUILD & PUSH UNIFIED IMAGE (FRONT + BACK)
   # ----------------------------------------------------
   build_unified_image:
