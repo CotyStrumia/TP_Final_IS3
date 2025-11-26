@@ -69,6 +69,8 @@ func main() {
 	// Esto permite que un único servicio de Render atienda frontend y backend.
 	distPath := filepath.Join(".", "dist")
 	r.Static("/assets", filepath.Join(distPath, "assets"))
+	// Exponer config.json para que axios pueda leerlo en runtime
+	r.StaticFile("/config.json", filepath.Join(distPath, "config.json"))
 	// Rutas no manejadas por la API → devolver index.html (SPA fallback)
 	r.NoRoute(func(c *gin.Context) {
 		c.File(filepath.Join(distPath, "index.html"))
