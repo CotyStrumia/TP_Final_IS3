@@ -3,18 +3,19 @@ FROM node:20 AS builder
 
 WORKDIR /app
 
-# 👇 Primero instalamos dependencias (esto permite cachear correctamente)
+# Instalamos dependencias con caché eficiente
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# 👇 Luego copiamos el resto del código
+# Copiamos el resto del código
 COPY . .
 
-# 👇 Recibe la variable de GitHub Actions
+# Variables recibidas desde GitHub Actions
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+ENV NODE_ENV=production
 
-# 👇 Build del frontend usando la variable correcta
+# Build del frontend usando la variable correcta
 RUN npm run build
 
 
@@ -23,10 +24,10 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# 👇 Servidor estático liviano
+# Servidor estático liviano
 RUN npm install -g serve
 
-# 👇 Traemos solo lo necesario: la carpeta dist
+# Traemos solo la carpeta dist
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
