@@ -44,26 +44,7 @@ jobs:
           name: go-coverage
           path: ventas-app/coverage.out
 
-  # ----------------------------------------------------
-  # BUILD BACKEND (BINARIO PARA CYPRESS)
-  # ----------------------------------------------------
-  build_backend:
-    runs-on: ubuntu-latest
-    needs: test_backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
 
-      - name: Build backend binary
-        working-directory: ./ventas-app
-        run: go build -o ../backend-app ./cmd/main.go
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: backend-app
-          path: backend-app
 
   # ----------------------------------------------------
   # TEST FRONTEND
@@ -87,8 +68,34 @@ jobs:
       - run: npm run test:ci
         working-directory: ./ventas-frontend
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: js-coverage
+          path: ventas-frontend/coverage
+
   # ----------------------------------------------------
-  # BUILD FRONTEND (CYPRESS PREVIEW)
+  # BUILD BACKEND
+  # ----------------------------------------------------
+  build_backend:
+    runs-on: ubuntu-latest
+    needs: test_backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build backend binary
+        working-directory: ./ventas-app
+        run: go build -o ../backend-app ./cmd/main.go
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-app
+          path: backend-app
+
+  # ----------------------------------------------------
+  # BUILD FRONTEND
   # ----------------------------------------------------
   build_frontend:
     runs-on: ubuntu-latest
@@ -99,17 +106,11 @@ jobs:
         with:
           node-version: "20"
 
-      # Solo para Cypress
-      - name: Inject QA API (for Cypress)
-        working-directory: ./ventas-frontend
-        run: |
-          echo "VITE_API_URL=${{ secrets.VITE_API_URL_QA }}" >> .env
-
       - name: Install deps
         working-directory: ./ventas-frontend
         run: npm ci
 
-      - name: Build frontend (Cypress preview)
+      - name: Build frontend
         working-directory: ./ventas-frontend
         run: npm run build
 
@@ -119,96 +120,11 @@ jobs:
           path: ventas-frontend/dist
 
   # ----------------------------------------------------
-  # CYPRESS E2E
-  # ----------------------------------------------------
-  e2e_tests:
-    runs-on: ubuntu-latest
-    needs: [build_backend, build_frontend]
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: rootpass
-          MYSQL_DATABASE: ventas
-        ports:
-          - "3306:3306"
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-retries=15
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: backend-app
-          path: .
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
-
-      - name: Install MySQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y default-mysql-client
-
-      - name: Wait for MySQL and seed database
-        run: |
-          echo "Waiting for MySQL..."
-          for i in $(seq 1 40); do
-            mysql -h127.0.0.1 -uroot -prootpass -e "SELECT 1" && break
-            sleep 2
-          done
-          mysql -h127.0.0.1 -uroot -prootpass ventas < db/ventas-app.sql || true
-
-      - name: Start Backend
-        env:
-          CI: "true"
-          APP_ENV: "ci"
-          DB_HOST: "127.0.0.1"
-          DB_PORT: "3306"
-          DB_USER: "root"
-          DB_PASS: "rootpass"
-          DB_NAME: "ventas"
-          DB_SSL_MODE: "disable"
-          JWT_SECRET: "testsecretci"
-          PORT: "8080"
-        run: |
-          chmod +x backend-app
-          nohup ./backend-app > backend.log 2>&1 &
-
-      - name: Install Node for preview
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Serve frontend
-        run: |
-          npm ci --prefix ventas-frontend
-          nohup npm --prefix ventas-frontend run dev -- --port 5173 --host 0.0.0.0 > frontend.log 2>&1 &
-
-      - name: Wait for backend & frontend
-        run: |
-          npx wait-on http://localhost:8080/productos http://localhost:5173 --timeout 180000
-
-      - name: Run Cypress
-        working-directory: ./ventas-frontend
-        env:
-          CYPRESS_BASE_URL: "http://localhost:5173"
-          CYPRESS_CI: "true"
-        run: npm run cypress:ci
-
-  # ----------------------------------------------------
-  # SonarQube Scan
+  # SonarCloud Scan
   # ----------------------------------------------------
   sonarcloud:
     name: SonarCloud Analysis
-    needs: [test_backend, test_frontend]
+    needs: [build_backend, build_frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -221,18 +137,23 @@ jobs:
           name: go-coverage
           path: ventas-app
 
+      - name: Download JS coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: js-coverage
+          path: ventas-frontend/coverage
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  
 
   # ----------------------------------------------------
   # BUILD & PUSH UNIFIED IMAGE (FRONT + BACK)
   # ----------------------------------------------------
   build_unified_image:
     runs-on: ubuntu-latest
-    needs: [e2e_tests]
+    needs: [sonarcloud]
     permissions:
       contents: read
       packages: write
@@ -254,7 +175,6 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_UNIFIED }}:release
 
-          
   # ----------------------------------------------------
   # DEPLOY QA (ONE SERVICE)
   # ----------------------------------------------------
@@ -266,12 +186,44 @@ jobs:
       - name: Deploy QA unified app
         run: curl -fsSL -X POST "${{ secrets.RENDER_APP_QA_HOOK }}" || true
 
+      - name: Wait for QA deployment
+        run: sleep 60
+
+  # ----------------------------------------------------
+  # CYPRESS E2E INTEGRATION (QA REAL)
+  # ----------------------------------------------------
+  e2e_integration_qa:
+    runs-on: ubuntu-latest
+    needs: deploy_qa
+    if: github.ref == 'refs/heads/qa' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: ./ventas-frontend
+        run: npm ci
+
+      - name: Wait for QA to be ready
+        run: |
+          npx wait-on ${{ secrets.QA_URL }} --timeout 120000
+
+      - name: Run Cypress against QA
+        working-directory: ./ventas-frontend
+        env:
+          CYPRESS_BASE_URL: ${{ secrets.QA_URL }}
+          CYPRESS_API_URL: ${{ secrets.QA_URL }}
+        run: npm run cypress:ci
+
   # ----------------------------------------------------
   # APROBACIÓN PARA PROD
   # ----------------------------------------------------
   approve_prod:
     runs-on: ubuntu-latest
-    needs: build_unified_image
+    needs: e2e_integration_qa
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prod'
     environment:
       name: production

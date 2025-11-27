@@ -2,12 +2,13 @@ import { defineConfig } from "cypress";
 
 export default defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:5174',
+    baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:5174',
     viewportWidth: 1280,
     viewportHeight: 720,
-    defaultCommandTimeout: 10000,
-    requestTimeout: 10000,
-    responseTimeout: 10000,
+    defaultCommandTimeout: 15000,
+    requestTimeout: 15000,
+    responseTimeout: 15000,
+    pageLoadTimeout: 30000,
 
     specPattern: [
       "cypress/e2e/ventas_flow.cy.js",
@@ -19,7 +20,7 @@ export default defineConfig({
     },
 
     env: {
-      apiUrl: 'http://localhost:8080'
+      apiUrl: process.env.CYPRESS_API_URL || 'http://localhost:8080'
     }
   },
 });

@@ -1,19 +1,20 @@
-describe('Acceptance - flujo básico', () => {
-  it('verifica que la app carga correctamente', () => {
-    // Usa baseUrl configurado en CI (QA_URL) o local
-    cy.visit('/');
-    // Aseguramos que el select exista y forzamos entorno QA en localStorage
-    cy.window().then((win) => {
-      win.localStorage.setItem('entorno', 'qa');
-      // Añadir token y rol fake para permitir acceso a rutas protegidas en CI/local
-      win.localStorage.setItem('token', 'fake-jwt-token');
-      win.localStorage.setItem('rol', 'vendedor');
-    });
-    // Ir a la pantalla de ventas
-    cy.visit('/ventas');
-    // Comprobamos que la ruta se cargó (no dependemos de contenido específico)
-    cy.url().should('include', '/ventas');
-    // Comprueba que el body tiene algo de contenido
+describe('Acceptance - flujo básico de integración', () => {
+  it('verifica que la app carga y permite login', () => {
+    // Visitar página de login
+    cy.visit('/login');
     cy.get('body').should('not.be.empty');
+    
+    // Hacer login real
+    cy.get('input[placeholder="Email"]').type('ariel');
+    cy.get('input[placeholder="Password"]').type('piqui123');
+    cy.contains('Ingresar').click();
+    
+    // Verificar que redirige (no queda en /login)
+    cy.url({ timeout: 10000 }).should('not.include', '/login');
+    
+    // Navegar a productos
+    cy.visit('/productos');
+    cy.url().should('include', '/productos');
+    cy.get('body').should('contain', 'Productos');
   });
 });

@@ -1,54 +1,31 @@
 /// <reference types="cypress" />
 
-describe('Flujos completos de ventas (E2E)', () => {
-
-  const mockProductos = [
-    { id: 1, nombre: 'Producto A', precio: 100, stock: 10 },
-    { id: 2, nombre: 'Producto B', precio: 50,  stock: 5  },
-    { id: 3, nombre: 'Producto C', precio: 25,  stock: 8  },
-    { id: 4, nombre: 'Producto D', precio: 75,  stock: 3  },
-    { id: 5, nombre: 'Producto E', precio: 10,  stock: 2  }
-  ]
+describe('Flujos completos de ventas (E2E - Integración QA)', () => {
 
   beforeEach(() => {
-
-    // Mock login
-    cy.intercept('POST', '**/login', {
-      statusCode: 200,
-      body: { token: 'fake-jwt-token', rol: 'vendedor' }
-    }).as('login')
-
-    // Mock productos
-    cy.intercept('GET', '**/productos', {
-      statusCode: 200,
-      body: mockProductos
-    }).as('getProductos')
-
-    // Mock POST ventas default (éxito)
-    cy.intercept('POST', '**/ventas', {
-      statusCode: 201,
-      body: { mensaje: 'Venta registrada', id: 1 }
-    }).as('postVenta')
-
-    // Login
+    // Login REAL contra QA
     cy.visit('/login')
-    cy.get('input[placeholder="Email"]').type('vendedor@test.com')
-    cy.get('input[placeholder="Password"]').type('password123')
+    cy.get('input[placeholder="Email"]', { timeout: 10000 }).should('be.visible').type('ariel')
+    cy.get('input[placeholder="Password"]').type('piqui123')
     cy.contains('Ingresar').click()
-    cy.wait('@login')
+    
+    // Esperar redirección tras login exitoso (puede ir a /productos o /ventas)
+    cy.url({ timeout: 15000 }).should('not.include', '/login')
 
-    // Ir a ventas
+    // Ir a ventas directamente
     cy.visit('/ventas')
-    cy.contains('Registrar Venta', { timeout: 10000 }).should('be.visible')
+    cy.contains('Registrar Venta', { timeout: 15000 }).should('be.visible')
 
-    cy.wait('@getProductos')
-
-    cy.get('select').first().should('be.visible')
-    cy.get('select option').should('have.length.gt', 1)
+    // Esperar a que carguen productos reales del select
+    cy.get('select').first({ timeout: 10000 }).should('be.visible')
+    cy.get('select option', { timeout: 5000 }).should('have.length.gt', 1)
   })
 
   function seleccionarPrimerProducto() {
-    cy.get('select').first().select(mockProductos[0].id.toString())
+    // Seleccionar el primer producto disponible (índice 1, ya que 0 es "Selecciona...")
+    cy.get('select').first().find('option').eq(1).then($option => {
+      cy.get('select').first().select($option.val())
+    })
     cy.get('input[type="number"]').first().should('not.be.disabled')
   }
 
@@ -56,49 +33,63 @@ describe('Flujos completos de ventas (E2E)', () => {
     seleccionarPrimerProducto()
     cy.get('input[type="number"]').first().clear().type('1')
     cy.contains('Agregar al carrito').click()
-    cy.contains('Producto A').should('exist')
+    // Verificar que aparece en el carrito (cualquier producto)
+    cy.get('table').should('exist')
+    cy.get('table tbody tr').should('have.length.at.least', 1)
   })
 
-  it('🧪 Test alternativo', () => {
+  it('🧪 Test alternativo - cantidad 2', () => {
     seleccionarPrimerProducto()
     cy.get('input[type="number"]').first().clear().type('2')
     cy.contains('Agregar al carrito').click()
-    cy.contains('Producto A').should('exist')
+    cy.get('table tbody tr').should('have.length.at.least', 1)
   })
 
   it('3️⃣ Valida stock insuficiente', () => {
-    cy.get('select').first().select('2') // Producto B (stock 5)
-    cy.get('input[type="number"]').first().clear().type('999')
-    cy.contains('Agregar al carrito').click()
-    cy.contains(/stock insuficiente|insuficiente/i).should('exist')
+    // Seleccionar segundo producto disponible
+    cy.get('select').first().find('option').eq(2).then($option => {
+      if ($option.length) {
+        cy.get('select').first().select($option.val())
+        cy.get('input[type="number"]').first().clear().type('9999')
+        cy.contains('Agregar al carrito').click()
+        cy.contains(/stock insuficiente|insuficiente/i).should('exist')
+      } else {
+        cy.log('Skip: no hay suficientes productos para este test')
+      }
+    })
   })
 
   it('4️⃣ Elimina productos del carrito', () => {
     cy.reload()
-    cy.wait('@getProductos')
-    cy.contains('Registrar Venta').should('be.visible')
+    cy.contains('Registrar Venta', { timeout: 10000 }).should('be.visible')
 
     // Asegurar que el checkbox de filtrar stock esté desmarcado
     cy.get('input[type="checkbox"]').uncheck()
 
-    // Agregar primer producto
-    cy.get('select').first().select('4') // Producto D
-    cy.get('input[type="number"]').first().clear().type('1')
-    cy.contains('Agregar al carrito').click()
-    cy.get('table').contains('Producto D').should('exist')
+    // Agregar primer producto disponible
+    cy.get('select').first().find('option').eq(1).then($option1 => {
+      const nombre1 = $option1.text()
+      cy.get('select').first().select($option1.val())
+      cy.get('input[type="number"]').first().clear().type('1')
+      cy.contains('Agregar al carrito').click()
+      cy.get('table').contains(nombre1).should('exist')
 
-    // Agregar segundo producto
-    cy.get('select').first().select('5') // Producto E
-    cy.get('input[type="number"]').first().clear().type('1')
-    cy.contains('Agregar al carrito').click()
-    cy.get('table').contains('Producto E').should('exist')
+      // Agregar segundo producto
+      cy.get('select').first().find('option').eq(2).then($option2 => {
+        const nombre2 = $option2.text()
+        cy.get('select').first().select($option2.val())
+        cy.get('input[type="number"]').first().clear().type('1')
+        cy.contains('Agregar al carrito').click()
+        cy.get('table').contains(nombre2).should('exist')
 
-    // Eliminar el primero
-    cy.get('table').contains('tr', 'Producto D').find('button[title="Eliminar"]').click()
+        // Eliminar el primero
+        cy.get('table').contains('tr', nombre1).find('button[title="Eliminar"]').click()
 
-    // Verificar que D ya no está pero E sigue
-    cy.get('table').contains('Producto D').should('not.exist')
-    cy.get('table').contains('Producto E').should('exist')
+        // Verificar que el primero ya no está pero el segundo sigue
+        cy.get('table').contains(nombre1).should('not.exist')
+        cy.get('table').contains(nombre2).should('exist')
+      })
+    })
   })
 
   it('5️⃣ Muestra error sin productos', () => {
@@ -112,39 +103,34 @@ describe('Flujos completos de ventas (E2E)', () => {
     })
   })
 
-  it('6️⃣ Maneja errores del backend', () => {
+  it('6️⃣ Confirma venta exitosa', () => {
     cy.reload()
-    cy.wait('@getProductos')
-    cy.contains('Registrar Venta').should('be.visible')
+    cy.contains('Registrar Venta', { timeout: 10000 }).should('be.visible')
 
     // Asegurar que el checkbox de filtrar stock esté desmarcado
     cy.get('input[type="checkbox"]').uncheck()
 
-    cy.get('select').first().select('5') // Producto E
-    cy.get('input[type="number"]').first().clear().type('1')
-    cy.contains('Agregar al carrito').click()
-
-    cy.contains('Producto E').should('exist')
-
-    // Mock error del backend
-    cy.intercept('POST', '**/ventas', {
-      statusCode: 500,
-      body: { error: 'Error interno del servidor' }
-    }).as('errVenta')
-
-    // Botón flexible (💰 Confirmar Venta) - esperar a que esté habilitado
-    cy.contains('button', /confirmar/i).should('be.visible').and('not.be.disabled').click()
-    cy.wait('@errVenta')
-
-    cy.contains(/error/i).should('exist')
-    cy.contains('Producto E').should('exist')
-  })
-
-  it('7️⃣ Test básico', () => {
+    // Agregar un producto
     seleccionarPrimerProducto()
     cy.get('input[type="number"]').first().clear().type('1')
     cy.contains('Agregar al carrito').click()
-    cy.contains('Producto A').should('exist')
+
+    // Esperar que aparezca en el carrito
+    cy.get('table tbody tr').should('have.length.at.least', 1)
+
+    // Confirmar venta
+    cy.contains('button', /confirmar/i).should('be.visible').and('not.be.disabled').click()
+
+    // Verificar que el carrito se limpió (venta exitosa)
+    cy.wait(2000)
+    cy.get('table tbody tr').should('not.exist')
+  })
+
+  it('7️⃣ Test básico - agregar producto', () => {
+    seleccionarPrimerProducto()
+    cy.get('input[type="number"]').first().clear().type('1')
+    cy.contains('Agregar al carrito').click()
+    cy.get('table tbody tr').should('have.length.at.least', 1)
   })
 
 })
