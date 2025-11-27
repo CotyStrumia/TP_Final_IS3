@@ -216,7 +216,7 @@ jobs:
         env:
           CYPRESS_BASE_URL: ${{ secrets.QA_URL }}
           CYPRESS_API_URL: ${{ secrets.QA_URL }}
-        run: npm run cypress:ci
+        run: npx cypress run --spec "cypress/e2e/ventas_flow.cy.js,cypress/e2e/acceptance.cy.js" --config baseUrl=${{ secrets.QA_URL }}
 
   # ----------------------------------------------------
   # APROBACIÓN PARA PROD
