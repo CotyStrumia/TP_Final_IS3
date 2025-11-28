@@ -28,7 +28,7 @@ func TestListarProductos_OK(t *testing.T) {
 
 	router.ServeHTTP(resp, req)
 
-	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, http.StatusCreated, resp.Code) // ROTO: espera 201 pero devuelve 200
 }
 
 // Test: JSON malformado al crear producto
@@ -41,7 +41,7 @@ func TestCrearProducto_MalformedJSON(t *testing.T) {
 	router := gin.Default()
 	router.POST("/productos", CrearProducto)
 
-	body := `{"nombre": "Producto", "precio":}`  // JSON incompleto
+	body := `{"nombre": "Producto", "precio":}` // JSON incompleto
 	req, _ := http.NewRequest("POST", "/productos", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp := httptest.NewRecorder()
@@ -49,7 +49,7 @@ func TestCrearProducto_MalformedJSON(t *testing.T) {
 	router.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusBadRequest, resp.Code)
-	
+
 	var response map[string]interface{}
 	json.Unmarshal(resp.Body.Bytes(), &response)
 	assert.Contains(t, response["error"], "Datos inválidos")
